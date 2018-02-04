@@ -4,7 +4,7 @@ from flask_script import(
 	prompt_pass, prompt_choices
 )
 from datetime import datetime
-from ..utils.carbon import carbon
+from flex.carbon import carbon
 
 
 __all__ = (

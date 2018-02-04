@@ -1,8 +1,10 @@
-from collections import MutableMapping, Mapping, ChainMap
+from collections import MutableMapping, Mapping
+from flex.utils.decorators import export
 
+
+__all__ = []
 
 NOTHING = object()
-
 
 
 class AttrMap(Mapping):
@@ -17,7 +19,6 @@ class AttrMap(Mapping):
 				"'%s' object has no attribute '%s'."\
 				% (self.__class__.__name__, name)
 			)
-
 
 class MutableAttrMap(MutableMapping, AttrMap):
 
@@ -47,7 +48,7 @@ class MutableAttrMap(MutableMapping, AttrMap):
 			except KeyError:
 				raise e
 
-
+@export
 class AttrDict(MutableAttrMap, dict):
 
 	__slots__ = ()
@@ -79,7 +80,7 @@ class AttrDict(MutableAttrMap, dict):
 		return self.__repr__()
 
 
-
+@export
 class ChainMap(MutableMapping):
 
 	__slots__ = '__mappings_chain__',
@@ -158,12 +159,13 @@ class ChainMap(MutableMapping):
 
 
 
-
+@export
 class AttrChainMap(ChainMap, MutableAttrMap):
 
 	__slots__ = ()
 
 
+@export
 class AttrBag(object):
 	"""A bag for storing."""
 

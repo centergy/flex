@@ -8,13 +8,13 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy_utils import generic_relationship
 
-from flex.utils.carbon import carbon
 
 import datetime
 
 
 @defer_column_creation
 class NestedSet(BaseNestedSets):
+
 	@declared_attr
 	def tree_id(cls):
 		return Column("tree_id", types.Integer)

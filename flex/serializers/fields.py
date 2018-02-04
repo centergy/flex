@@ -1,7 +1,7 @@
 from marshmallow.fields import *
 from marshmallow.fields import DateTime as BaseDateTime
 
-from flex.utils import carbon
+from flex import carbon
 from sqlalchemy_utils.types import PhoneNumber as _PhoneNumber
 
 import phonenumbers

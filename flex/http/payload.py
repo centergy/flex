@@ -64,8 +64,11 @@ class Payload(object):
 	renderers = context_property('renderers', doc='List of renderers to choose from.')
 	template_name = context_property('template_name', doc='The HTML template file name.')
 
-	def __init__(self, headers=None, **context):
+	def __init__(self, status=None, mimetype=None, headers=None, data=None,
+			errors=None, context=None):
 		self._response_options = dict(
+			status=status,
+			mimetype=mimetype,
 			headers= Headers(headers)
 		)
 
@@ -74,10 +77,10 @@ class Payload(object):
 		self._body.ok = None
 		self._body.code = None
 		self._body.status = None
-		self._body.data = OrderedDict()
-		self._body.errors = OrderedMultiDict()
+		self._body.data = OrderedDict() if data is None else data
+		self._body.errors = OrderedMultiDict() if errors is None else errors
 
-		self._context = AttrBag(**context)
+		self._context = AttrBag(**(context or {}))
 		self.is_prepared = False
 
 	@property

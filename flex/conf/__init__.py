@@ -52,7 +52,7 @@ class LazyConfig(LazyObject):
 		return '<LazyConfig %s>' % str(self._wrapped)
 
 	@property
-	def ctx(self):
+	def top(self):
 		"""Returns configuration for the current_app if any."""
 		if current_app:
 			return current_app.config

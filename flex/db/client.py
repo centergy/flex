@@ -66,16 +66,14 @@ class _EngineConnector(object):
 
 
 class _QueryProperty(object):
-	def __init__(self, client):
-		self.client = client
 
-	def __get__(self, obj, type):
-		try:
-			mapper = orm.class_mapper(type)
-			if mapper:
-				return type._opts.query_class(mapper, session=self.client.session)
-		except UnmappedClassError:
-			return None
+	# __slots__ = '_db',
+
+	# def __init__(self):
+		# self._db = db
+
+	def __get__(self, obj, cls):
+		return cls.mgr and cls.mgr.query()
 
 
 class Client(SQLClient):
@@ -133,10 +131,8 @@ class Client(SQLClient):
 
 	def make_declarative_base(self, model_class, metadata=None):
 		model = declarative_base(cls=model_class, metadata=metadata)
-		model.query = _QueryProperty(self)
-		model.objects = manager_property(using=self)
-		model.archives = archives_manager_property(using=self)
-		model._db_client = self
+		model.mgr = manager_property(self)
+		model.query = _QueryProperty()
 		return model
 
 	def database_exists(self, bind=None, engine=None):

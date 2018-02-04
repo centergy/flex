@@ -3,7 +3,7 @@ import inspect
 from werkzeug.wrappers import Response as BaseResponse
 from flask.views import View as FlaskView
 from ..utils import json
-from flask import abort as _abort, request, current_app, session
+from flask import request, current_app, session
 from werkzeug.datastructures import Headers
 from ..http import exc, status, Payload, Response
 from ..utils.decorators import cached_property
@@ -77,6 +77,10 @@ class View(FlaskView, metaclass=ViewType):
 
 	payload_class = Payload
 
+	mimetype = None
+
+	default_status = 200
+
 	default_response_headers = None
 
 	@property
@@ -130,19 +134,30 @@ class View(FlaskView, metaclass=ViewType):
 
 	def created_payload(self):
 		cls = self.payload_class
-		return cls(self.default_response_headers, **self.get_payload_context())
+		return cls(
+			status=self.default_status,
+			mimetype=self.mimetype,
+			headers=self.default_response_headers,
+			data=self.create_payload_data_store(),
+			errors=self.create_payload_error_store(),
+			context=self.get_payload_context()
+		)
+
+	def create_payload_data_store(self):
+		return None
+
+	def create_payload_error_store(self):
+		return None
 
 	def get_payload_context(self):
 		return {}
 
-	def abort(self, status=None, **kwargs):
-		status = status or self.payload.status
-
+	def abort(self, status, *args, **kwargs):
 		if status and not is_http_status_code(status):
 			raise ValueError('%s is not a valid HTTP status code.' % (status,))
 
 		kwargs.setdefault('payload', self.payload)
-		return _abort(status, **kwargs)
+		return exc.abort(status, *args, **kwargs)
 
 	def dispatch(self):
 		return self.build_response()

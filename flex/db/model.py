@@ -1,6 +1,6 @@
 import inspect
-from sqlalchemy import asc, desc, MetaData
 from sqlservice import ModelBase
+from sqlalchemy import asc, desc, MetaData, orm
 from sqlservice.model import ModelMeta as BaseModelMeta
 from sqlalchemy.ext.declarative import (
 		declared_attr, has_inherited_table,
@@ -13,7 +13,7 @@ from . import types
 
 from flex.helpers import uzi
 from flex.conf import config
-from flex.utils.carbon import carbon
+from flex import carbon
 from flex.core.exc import ImproperlyConfigured
 from flex.utils.module_loading import import_string
 from flex.utils.decorators import locked_cached_property
@@ -326,6 +326,42 @@ class BaseModel(ModelBase):
 				return False
 		return True
 
+	@classmethod
+	def _get_db(cls, db=None):
+		return db or cls.mgr.db
+
+	@classmethod
+	def _get_db(cls, db=None):
+		return db or cls.mgr.db
+
+	def _db_session(self, db=None):
+		if db is None:
+			return orm.object_session(self) or self._get_db().session
+		else:
+			return db.session
+
+	def save(self, commit=True, db=None):
+		"""Save the current instance. Override this in a subclass if you want to
+		control the saving process.
+		"""
+		session = self._db_session(db)
+		session.add(self)
+		if commit and not session.autocommit:
+			session.commit()
+
+	def delete(self, commit=True, db=None):
+		session = self._db_session(db)
+		session.delete(self)
+		if commit and not session.autocommit:
+			session.commit()
+
+	def __str__(self):
+		return '{%s}' % ', '.join(('%s=%r' % (c,v)) for c,v in self.columns())
+
+	def __repr__(self):
+		return '%s(%s)' % (self.__class__.__name__, self)
+
+
 	# def validate(self):
 	# 	cls = self._opts.validator
 	# 	if not cls:
@@ -336,6 +372,14 @@ class BaseModel(ModelBase):
 	# 		return validator.validate('update')
 	# 	else:
 	# 		return validator.validate('create')
+
+
+class ModelRegistry(dict):
+
+	__slots__ = ()
+
+
+
 
 
 def declarative_base(cls=None, metadata=None, mapper=None,
@@ -386,7 +430,10 @@ def declarative_base(cls=None, metadata=None, mapper=None,
 		metadata = getattr(cls, 'metadata', MetaData(naming_convention=CONSTRAINT_NAMING_CONVENTION))
 
 	if metaclass is None:
-		metaclass = getattr(cls, 'metaclass', None)
+		metaclass = getattr(cls, 'metaclass', ModelMeta)
+
+	if class_registry is None:
+		class_registry = ModelRegistry()
 
 	options = {
 			'cls': cls,
@@ -405,7 +452,7 @@ def declarative_base(cls=None, metadata=None, mapper=None,
 	if mapper:
 		options['mapper'] = mapper
 
-	if class_registry:
+	if class_registry is not None:
 		options['class_registry'] = class_registry
 
 	Base = _declarative_base(**options)

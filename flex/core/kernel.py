@@ -45,7 +45,7 @@ def preboot_method(f):
 
 
 
-class Application(Flask):
+class Kernel(Flask):
 
 	is_cli = True
 
@@ -75,7 +75,7 @@ class Application(Flask):
 			instance_relative_config=instance_relative_config
 		)
 
-		super(Application, self).__init__(import_name, **kwargs)
+		super(Kernel, self).__init__(import_name, **kwargs)
 		self._has_booted = False
 
 	@locked_cached_property
@@ -202,7 +202,7 @@ class Application(Flask):
 						Starting with Flask 0.6, ``OPTIONS`` is implicitly
 						added and handled by the standard request handling.
 		"""
-		func = super(Application, self).route(rule, endpoint=endpoint, **options)
+		func = super(Kernel, self).route(rule, endpoint=endpoint, **options)
 		return func if view_func is None else func(view_func)
 
 	@setupmethod
@@ -224,25 +224,25 @@ class Application(Flask):
 		"""
 		if isinstance(blueprint, str):
 			blueprint = import_string(blueprint)
-		return super(Application, self).register_blueprint(blueprint, **options)
+		return super(Kernel, self).register_blueprint(blueprint, **options)
 
 	@postboot_method
 	def run(self, host=None, port=None, debug=None, **options):
 		signals.app_starting.send(
 			self, host=host, port=port, debug=debug, options=options)
-		return super(Application, self).run(host, port, debug, **options)
+		return super(Kernel, self).run(host, port, debug, **options)
 
 	@postboot_method
 	def wsgi_app(self, environ, start_response):
-		return super(Application, self).wsgi_app(environ, start_response)
+		return super(Kernel, self).wsgi_app(environ, start_response)
 
 	@postboot_method
 	def test_client(self, use_cookies=True, **kwargs):
-		return super(Application, self).test_client(host, port, debug, **options)
+		return super(Kernel, self).test_client(host, port, debug, **options)
 
 	@postboot_method
 	def test_request_context(self, *args, **kwargs):
-		return super(Application, self).test_request_context(*args, **kwargs)
+		return super(Kernel, self).test_request_context(*args, **kwargs)
 
 	def perform_content_negotiation(self, renderers=None, *, force=False, **options):
 		"""Determine which renderer and mimetype to use to render the response.

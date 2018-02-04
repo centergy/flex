@@ -58,7 +58,7 @@ SQLALCHEMY_FIELD_MAPPING = SubClassDict({
     String: _string,
     TIMESTAMP: forms.DateTimeField,
     VARCHAR: _string,
-    types.UUIDType: forms.UUIDField
+    types.pg.UUID: forms.UUIDField
 })
 
 

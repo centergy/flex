@@ -1,75 +1,49 @@
 
-
-# class CreateModelMixin(object):
-# 	"""
-# 	Create a model instance.
-# 	"""
-# 	def create(self, request, *args, **kwargs):
-# 		serializer = self.get_serializer(data=request.data)
-# 		serializer.is_valid(raise_exception=True)
-# 		self.perform_create(serializer)
-# 		headers = self.get_success_headers(serializer.data)
-# 		return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-# 	def perform_create(self, serializer):
-# 		serializer.save()
-
-# 	def get_success_headers(self, data):
-# 		try:
-# 			return {'Location': data[api_settings.URL_FIELD_NAME]}
-# 		except (TypeError, KeyError):
-# 			return {}
-
-
 class ListModelMixin(object):
 	"""List a queryset."""
 
-	def list(self):
-		query = self.get_query(True)
-		page = self.paginate_query(query)
-		serializer = self.get_serializer()
+	def get_list(self):
+		return self.apply_pagination(self.query(apply_filters=True))
 
-		if page is not None:
-			return serializer.dump(page, many=True).data
-		else:
-			return serializer.dump(query, many=True).data
-
-	def get(self):
-		self.payload.data = self.list()
+	def list(self, *args, **kwargs):
+		data = self.get_list()
+		self.payload.data = self.get_serializer().dump(data, many=True).data
 
 
 class CreateModelMixin(object):
 	"""Create a model instance."""
 
-	def create(self):
-		data, errors = self.get_serializer()\
-				.loads(self.request.get_data(as_text=True))
-		if not errors:
-			self.model_class.objects.save(data)
-			self.payload.status = 201
-			self.payload.data['pk'] = data.pk
-			return self.dispatch()
-		else:
-			self.payload.errors = errors
-			return self.abort(400)
+	def get_success_status(self):
+		return 201
 
-	def perform_create(self):
-		pass
+	def get_payload_data(self, obj):
+		if self.lookup_field and hasattr(obj, self.lookup_field):
+			key = self.lookup_kwarg or self.lookup_field
+			return { key : getattr(obj, self.lookup_field) }
 
-	def post(self, **kwargs):
-		self.create()
+	def perform_create(self, data):
+		obj = self.manager.create(data)
+
+	def create(self, *args, **kwargs):
+		data, errors = self.get_serializer().loads(self.request.input)
+		if errors:
+			return self.abort(400, errors)
+
+		obj = self.perform_create(data)
+		if obj is not None:
+			data = self.get_payload_data(obj)
+			if data is not None:
+				self.payload.data = data
+
+		self.payload.status = self.get_success_status()
+
 
 
 class RetrieveModelMixin(object):
 	"""Retrieve a model instance."""
 
-	def retrieve(self):
+	def retrieve(self, *args, **kwargs):
 		obj = self.get_object()
-		if obj is not None:
-			return self.get_serializer().dump(obj).data
-
-	def get(self, **kwargs):
-		self.payload.data = self.retrieve()
-		if self.payload.data is None:
-			return self.abort(404)
-
+		if obj is None:
+			self.abort(404)
+		self.payload.data = self.get_serializer().dump(obj).data

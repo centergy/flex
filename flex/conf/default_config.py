@@ -75,3 +75,8 @@ RENDERERS = lazy_import([
 DEFAULT_ADDONS = [
 	'flex.http.addon',
 ]
+
+
+PASSLIB_SCHEMES = [
+	'pbkdf2_sha512',
+]

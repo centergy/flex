@@ -1,6 +1,7 @@
 from sqlalchemy import orm
 from sqlalchemy.orm.exc import UnmappedClassError
-
+from collections import defaultdict
+from threading import Lock
 
 #########################################################
 ## Is this really thread safe??? Checkout the copy()s. ##
@@ -10,16 +11,28 @@ from sqlalchemy.orm.exc import UnmappedClassError
 
 class manager_property(object):
 
-	def __init__(self, context=None, using=None):
-		self.using = using
-		self.context = context
+	__slots__ = '_db', '_cache', '_lock', '_instances'
+
+	def __init__(self, db, cache=True):
+		self._db = db
+		self._cache = cache
+		if self._cache:
+			self._lock = Lock()
+			self._instances = {}
 
 	def __get__(self, obj, cls):
+		if self._cache:
+			with self._lock:
+				if cls not in self._instances:
+					self._instances[cls] = self.create_instance(cls)
+				return self._instances[cls]
+		else:
+			return self.create_instance(cls)
+
+	def create_instance(self, cls):
 		try:
 			orm.class_mapper(cls)
-			return cls._opts.manager_class(
-					self.using or cls._db_client, cls, self.context
-				)
+			return cls._opts.manager_class(self._db, cls)
 		except UnmappedClassError:
 			return None
 
@@ -100,31 +113,6 @@ class Manager(object):
 			yield col == val
 		# return criterion
 
-	def default_create_data(self):
-		return {}
-
-	def get_create_data(self, data):
-		default = self.default_create_data().copy()
-		if data is not None:
-			default.update(data)
-		return default
-
-	def create(self, _attr_mapping=None, **kwargs):
-		model = self.create_model(self.get_create_data(_attr_mapping or kwargs))
-		return model
-
-	def new_model(self, **data):
-		return self.model_class(**data)
-
-	def new(self, **data):
-		return self.apply_context_data(self.new_model(**data))
-
-	def create_model(self, data):
-		model = self.new(**data)
-		model.validate()
-		self.db.add(model)
-		return model
-
 	def apply_context_data(self, model):
 		if not self.context:
 			return model
@@ -132,37 +120,57 @@ class Manager(object):
 			setattr(model, k, v)
 		return model
 
-	def default_update_data(self):
-		return {}
+	def new_entity(self, **data):
+		return self.model_class(**data)
 
-	def get_update_data(self, data):
-		default = self.default_update_data().copy()
-		if data is not None:
-			default.update(data)
-		return default
+	def new(self, **data):
+		return self.apply_context_data(self.new_entity(**data))
 
-	def update(self, model, data=None):
-		model = self.update_model(model, self.get_update_data(data))
+	def create(self, *args, **kwargs):
+		if len(args) > 1:
+			raise TypeError('expected at most 1 positional arg, got %d' % len(args))
+
+		data = dict(args[0]) if args else kwargs
+		if args and kwargs:
+			data.update(kwargs)
+		return self.create_model(data)
+
+	def create_model(self, data):
+		model = self.new(**data)
+		model.save()
 		return model
 
-	def update_model(self, model, data):
-		model.update(data)
-		model.validate()
-		self.db.add(model)
-		return model
+	# def default_update_data(self):
+	# 	return {}
 
-	def save(self, *models, commit=True, before=None, after=None, identity=None):
-		# raise Exception("Re implement this.")
-		models = self.db.save(models, before=before, after=after, identity=identity)
-		if commit:
-			self.db.commit()
-		return models
+	# def get_update_data(self, data):
+	# 	default = self.default_update_data().copy()
+	# 	if data is not None:
+	# 		default.update(data)
+	# 	return default
 
-	def delete(self, *models):
-		for model in models:
-			self.db.delete(model)
-		self.db.commit()
-		return True
+	# def update(self, model, data=None):
+	# 	model = self.update_model(model, self.get_update_data(data))
+	# 	return model
+
+	# def update_model(self, model, data):
+	# 	model.update(data)
+	# 	# model.validate()
+	# 	self.db.add(model)
+	# 	return model
+
+	# def save(self, *models, commit=True, before=None, after=None, identity=None):
+	# 	# raise Exception("Re implement this.")
+	# 	models = self.db.save(models, before=before, after=after, identity=identity)
+	# 	if commit:
+	# 		self.db.commit()
+	# 	return models
+
+	# def delete(self, *models):
+	# 	for model in models:
+	# 		self.db.delete(model)
+	# 	self.db.commit()
+	# 	return True
 
 	def with_context(self, **context):
 		repo = self.copy()

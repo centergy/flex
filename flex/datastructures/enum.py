@@ -6,6 +6,10 @@ from enum import Enum as BaseEnum, IntEnum as BaseIntEnum
 from enum import EnumMeta as BaseEnumMeta
 from enum import _EnumDict
 
+from flex.utils.decorators import export
+
+__all__ = []
+
 
 class EnumMeta(BaseEnumMeta):
 	def __new__(mcs, name, bases, attrs):
@@ -35,7 +39,7 @@ class EnumMeta(BaseEnumMeta):
 				raise e
 
 
-
+@export
 class Enum(EnumMeta('Enum', (BaseEnum,), _EnumDict())):
 
 	@classmethod
@@ -46,6 +50,7 @@ class Enum(EnumMeta('Enum', (BaseEnum,), _EnumDict())):
 		return str(self.label)
 
 
+@export
 class IntEnum(EnumMeta('IntEnum', (BaseIntEnum,), _EnumDict())):
 
 	def __str__(self):

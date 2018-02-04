@@ -102,7 +102,7 @@ class HTTPException(BaseHTTPException):
 			self.payload.data = payload.data
 			self.payload.errors.update(payload.errors)
 			self.payload.context.update(payload.context)
-			self.payload.headers.update(payload.headers)
+			self.payload.headers.extend(payload.headers)
 			self.payload.mimetype = payload.mimetype or self.payload.mimetype
 
 	@cached_property
@@ -258,11 +258,11 @@ class Throttled(HTTPException):
 class Aborter(BaseAborter):
 	"""docstring for Aborter"""
 
-	def __call__(self, code, **kwargs):
+	def __call__(self, code, *args, **kwargs):
 		if code in self.mapping:
-			raise self.mapping[code](**kwargs)
+			raise self.mapping[code](*args, **kwargs)
 
-		if not kwargs:
+		if not args and not kwargs:
 			if not isinstance(code, (int, str)) \
 				or (isinstance(code, str) and re.search(r'[\s]+', code)):
 				raise HTTPException(response=code)

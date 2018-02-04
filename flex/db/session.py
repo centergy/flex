@@ -22,4 +22,16 @@ class Session(SessionBase):
 				return state.db.get_engine(self.app, bind=bind_key)
 		return SessionBase.get_bind(self, mapper, clause)
 
+	# def save(self, *models, commit=True):
+	# 	# raise Exception("Re implement this.")
+	# 	self.add_all(models)
+	# 	if not self.autocommit and commit:
+	# 		self.commit()
+
+	# def delete(self, *models, commit=False):
+	# 	for model in models:
+	# 		super(Session, self).delete(model)
+
+	# 	if not self.autocommit and commit:
+	# 		self.commit()
 

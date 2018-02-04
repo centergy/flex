@@ -260,14 +260,16 @@ class dict_lookup_property(object):
 		)
 
 
-def export(obj, module=None, name=None):
-	module = sys.modules[module or obj.__module__]
-	ol = getattr(module, '__all__', None)
-	if ol is None:
-		ol = []
-		setattr(module, '__all__', ol)
-	ol.append(name or obj.__name__)
-	return obj
+def export(obj=NOTHING, *, name=None, exports=None, module=None):
+	def add_to_all(_obj):
+		_module = sys.modules[module or _obj.__module__]
+		_exports = exports or getattr(_module, '__all__', None)
+		if _exports is None:
+			_exports = []
+			setattr(_module, '__all__', _exports)
+		_exports.append(name or _obj.__name__)
+		return _obj
+	return add_to_all if obj is NOTHING else add_to_all(obj)
 
 
 def _attr_is_sloted(cls, attr):

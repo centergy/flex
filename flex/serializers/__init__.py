@@ -1,89 +1,34 @@
 import six
 from marshmallow import (
-	utils as marsh_utils, Schema as BaseSchema, SchemaOpts,
-	pre_load, post_load, post_dump, MarshalResult, ValidationError
+	utils as marsh_utils, Schema as BaseSchema, SchemaOpts as BaseSchemaOpts,
+	pre_load, post_load, post_dump, MarshalResult, ValidationError,
+	validates_schema, validates
 )
 import marshmallow_sqlalchemy as marsh_sa
-
+from flex.http.exc import ValidationError as HttpValidationError
 from ..db import db
-from . import fields
+from . import fields, validate
 
+
+class SchemaOpts(BaseSchemaOpts):
+
+	def __init__(self, meta, *args, **kwargs):
+		super(SchemaOpts, self).__init__(meta, *args, **kwargs)
+		self.strict = getattr(meta, 'strict', False)
 
 
 class Schema(BaseSchema):
-	__envelope__ = {
-		'dump' : None,
-		'load' : None,
-	}
-
-	def get_envelope_key(self, many, action):
-		if not self.__envelope__:
-			return None
-		envelope = self.__envelope__.get(action, None)
-		if not envelope:
-			return None
-		if isinstance(envelope, str):
-			return envelope
-		elif isinstance(envelope, (tuple, list)):
-			return envelope[1] if many else envelope[0]
-		elif isinstance(envelope, dict):
-			return envelope.get('many') if many else envelope.get('single')
-		raise Exception("Invalid schema envelope configuration in {}".format(self.__class__))
-
-	@pre_load(pass_many=True)
-	def _pre_process_loaded(self, data, many):
-		return self.sanitize_data(self.unwrap_envelope(data, many), many)
-
-	def sanitize_data(self, data, many):
-		return data
-
-	# def sanitize_data(self, data, many):
-	# 	if not data:
-	# 		return data
-	# 	if many:
-	# 		return self.sanitize_many(data)
-	# 	else:
-	# 		return self.sanitize_one(data)
-
-	# def sanitize_many(self, items):
-	# 	for item in items:
-	# 		self.sanitize_one(item)
-	# 	return items
-
-	# def sanitize_one(self, data):
-	# 	for k,v in data.items():
-	# 		data[k] = self.sanitize_field(v, k, data)
-	# 	return data
-
-	# def sanitize_field(self, value, field_name, data):
-	# 	field = self.fields.get(field_name)
-	# 	if field:
-	# 		sanitizers = field.metadata.get('sanitize')
-	# 		if sanitizers:
-	# 			for sanitizer in yielder(sanitizers):
-	# 				sanitizer = _get_sanitizer(sanitizer)
-	# 				value = sanitizer(value)
-	# 	return value
-
-	def unwrap_envelope(self, data, many):
-		key = self.get_envelope_key(many, 'load')
-		return data[key] if key else data
-
-	@post_dump(pass_many=True)
-	def wrap_with_envelope(self, data, many=False):
-		key = self.get_envelope_key(many, 'dump')
-		return {key: data} if key else data
+	OPTIONS_CLASS = SchemaOpts
 
 
-
-class ModelSchemaOpts(marsh_sa.ModelSchemaOpts):
+class ModelSchemaOpts(marsh_sa.ModelSchemaOpts, SchemaOpts):
 
 	def __init__(self, meta, *args, **kwargs):
+		SchemaOpts.__init__(self, meta, *args, **kwargs)
 		self.model = getattr(meta, 'model', None)
 		self.model_converter = getattr(meta, 'model_converter', marsh_sa.ModelConverter)
 		self.include_fk = getattr(meta, 'include_fk', False)
 		self._sqla_session = getattr(meta, 'sqla_session', lambda: db.session)
-		SchemaOpts.__init__(self, meta, *args, **kwargs)
 
 	@property
 	def sqla_session(self):
@@ -97,6 +42,29 @@ class ModelSchema(Schema, marsh_sa.ModelSchema):
 	OPTIONS_CLASS = ModelSchemaOpts
 
 	# def on_bind_field(self, name, field):
+
+
+
+def validation_error_handler(e):
+	if isinstance(e, ValidationError):
+		return HttpValidationError(e.normalized_messages('invalid_input')).get_response()
+	raise e
+
+
+class SerializersAddon(object):
+
+	__slots__ = ()
+
+	# default_config = dict()
+	name = 'flex.serializers'
+
+	def init_app(self, app):
+		if self.name not in app.extensions:
+			app.register_error_handler(ValidationError, validation_error_handler)
+			app.extensions[self.name] = True
+
+
+addon = SerializersAddon()
 
 
 

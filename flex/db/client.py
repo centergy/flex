@@ -239,7 +239,7 @@ class Client(SQLClient):
 				RuntimeWarning
 			)
 
-		self.init_config(config)
+		config = self.init_config(config)
 
 		_set_app_state(self, app)
 
@@ -251,7 +251,11 @@ class Client(SQLClient):
 		def shutdown_session(response_or_exc):
 			if self.get_config(app).get('COMMIT_ON_TEARDOWN'):
 				if response_or_exc is None:
-					self.commit()
+					try:
+						self.commit()
+					except:
+						self.rollback()
+						raise
 
 			self.remove()
 			return response_or_exc
@@ -279,6 +283,7 @@ class Client(SQLClient):
 		for provider in config.BIND_PROVIDERS:
 			binds.shift(Proxy(provider))
 		config.BINDS = binds
+		return config
 
 	def make_engine_options(self, config):
 		"""Return engine options from :attr:`config` for use in

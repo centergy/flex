@@ -107,7 +107,10 @@ class GenericView(View):
 		model_class = self.get_model_class()
 
 		lookup_field = getattr(model_class, self.lookup_field)
-		return query.filter(lookup_field == self.kwargs[lookup_kwarg]).one()
+		rv = query.filter(lookup_field == self.kwargs[lookup_kwarg]).one()
+		if rv is None:
+			return self.abort(404, self.kwargs[lookup_kwarg])
+		return rv
 
 	def get_serializer(self, *args, **kwargs):
 		"""
@@ -203,7 +206,7 @@ class ListCreateAPIView(mixins.ListModelMixin,mixins.CreateModelMixin,APIView):
 	def get(self, *args, **kwargs):
 		return self.list(*args, **kwargs)
 
-	def post(self, request, *args, **kwargs):
+	def post(self, *args, **kwargs):
 		return self.create(*args, **kwargs)
 
 

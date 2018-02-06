@@ -1,8 +1,12 @@
 from marshmallow.fields import *
 from marshmallow.fields import DateTime as BaseDateTime
+from sqlalchemy_utils import (
+	PhoneNumberParseException, PhoneNumber as _PhoneNumber
+)
 
+from flex.db import types
+from flex.conf import config
 from flex import carbon
-from sqlalchemy_utils.types import PhoneNumber as _PhoneNumber
 
 import phonenumbers
 
@@ -65,16 +69,37 @@ class Enum(Field):
 class PhoneNumber(String):
 
 	default_error_messages = {
+		'required': 'This field is required.',
+		'type': 'Invalid input type.', # used by Unmarshaller
+		'null': 'This field is required.',
 		'invalid': "This field must be a valid phone number ('+XXXXXXXXXX', or'0XXXXXXXXX' if local). 15 digits max.",
 	}
+	default_region = 'US'
 
 	def __init__(self, region=None, **kwargs):
 		super(PhoneNumber, self).__init__(**kwargs)
-		self.region = region
+		self._region = region
+
+	@property
+	def region(self):
+		if self._region is None:
+			return config.top.get('LOCALE_TERRITORY') or self.default_region
+		return self._region
 
 	def _deserialize(self, value, attr, data):
 		value = super(PhoneNumber, self)._deserialize(value, attr, data)
-		phn = _PhoneNumber(value, self.region)
-		if not phn.is_valid_number():
+
+		value = value and value.strip()
+		if not value:
+			if not self.required:
+				return None
+			self.fail('required')
+
+		try:
+			phn = _PhoneNumber(value, self.region)
+			if phn.is_valid_number():
+				return phn
+		except PhoneNumberParseException as e:
+			pass
+		finally:
 			self.fail('invalid')
-		return phn

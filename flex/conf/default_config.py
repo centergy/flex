@@ -74,6 +74,7 @@ RENDERERS = lazy_import([
 
 DEFAULT_ADDONS = [
 	'flex.http.addon',
+	'flex.serializers.addon',
 ]
 
 

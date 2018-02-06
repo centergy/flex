@@ -32,7 +32,7 @@ class HttpAddon(Blueprint):
 					app.register_error_handler(e, config.ERROR_HANDLER)
 
 			app.register_blueprint(self)
-			app.extensions['_http_addon'] = self
+			app.extensions['_http_addon'] = True
 
 	def init_config(self, app):
 		config = app.config.namespace('HTTP_')
@@ -42,4 +42,5 @@ class HttpAddon(Blueprint):
 		return config
 
 
-addon = HttpAddon('flex.http', __name__, template_folder='templates')
+addon = HttpAddon('flex.http', __name__,
+			template_folder='templates')

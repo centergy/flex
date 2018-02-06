@@ -1,8 +1,10 @@
 import inspect
+import sqlalchemy as sa
 from sqlservice import ModelBase
 from sqlalchemy import asc, desc, MetaData, orm
 from sqlservice.model import ModelMeta as BaseModelMeta
 from sqlalchemy.ext.declarative import (
+		DeclarativeMeta,
 		declared_attr, has_inherited_table,
 		declarative_base as _declarative_base
 	)
@@ -24,6 +26,8 @@ from .managers import Manager, ArchivesManager
 
 MODEL_OPTIONS = set([
 	('bind', 'bind_key', True),
+	('autoflush', 'autoflush', True),
+	('autocommit', 'autocommit', True),
 	('applabel', 'applabel', True),
 	('tablename', '_tablename', True),
 	('query_class', '_query_class', True),
@@ -71,6 +75,9 @@ class Options(object):
 		self.mapper_args = {}
 		self.table_args = None
 
+		self.autoflush = False
+		self.autocommit = False
+
 	# @locked_cached_property
 	# def soft_deletes(self):
 	# 	return self.soft_deletes_on and hasattr(self.model_class, self.soft_deletes_on)
@@ -85,6 +92,17 @@ class Options(object):
 					return uzi.snake(self.model_class.__name__)
 			else:
 				return self._tablename
+
+	@locked_cached_property
+	def concrete(self):
+		"""The model class that holds __tablename__ in the inheritance chain if
+		the model is part of a polymorphic inheritance tree. Otherwise, the
+		model class is returned.
+		"""
+		for c in self.model_class.mro():
+			if c is not BaseModel and isinstance(c, DeclarativeMeta)\
+				and not has_inherited_table(c):
+				return c
 
 	@locked_cached_property
 	def query_class(self):
@@ -163,8 +181,6 @@ class Options(object):
 		setattr(cls, name, self)
 
 		self._set_model_timestamp_columns()
-
-		return
 
 	def _prepare(self):
 		self.ordering_direction = order_dir(self.ordering_direction)
@@ -306,8 +322,8 @@ class BaseModel(ModelBase):
 
 	@hybrid_property
 	def pk(self):
-		cols = self.pk_columns()
-		return cols[0] if len(cols) == 1 else None
+		rv = [getattr(self, c.key) for c in self.pk_columns()]
+		return rv[0] if len(rv) == 1 else tuple(rv)
 
 	@declared_attr
 	def __tablename__(cls):
@@ -340,20 +356,30 @@ class BaseModel(ModelBase):
 		else:
 			return db.session
 
-	def save(self, commit=True, db=None):
+	def save(self, *, flush=None, commit=None, db=None, session=None):
 		"""Save the current instance. Override this in a subclass if you want to
 		control the saving process.
 		"""
-		session = self._db_session(db)
+		session = session or self._db_session(db)
 		session.add(self)
-		if commit and not session.autocommit:
-			session.commit()
+		self._flush_or_commit(session, flush=flush, commit=commit, db=db)
 
-	def delete(self, commit=True, db=None):
+	def delete(self, *, flush=None, commit=None, db=None, session=None):
 		session = self._db_session(db)
 		session.delete(self)
+		self._flush_or_commit(session, flush=flush, commit=commit, db=db, deleted=True)
+
+	def _flush_or_commit(self, session, flush=None, commit=None, db=None, deleted=None):
+		if flush is None:
+			flush = self.__class__._opts.autoflush
+
+		if commit is None:
+			commit = self.__class__._opts.autocommit
+
 		if commit and not session.autocommit:
 			session.commit()
+		elif flush and not session.autoflush:
+			session.flush()
 
 	def __str__(self):
 		return '{%s}' % ', '.join(('%s=%r' % (c,v)) for c,v in self.columns())

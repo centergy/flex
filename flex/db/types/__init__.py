@@ -61,16 +61,16 @@ from sqlalchemy.types import (
 
 from sqlalchemy_utils.types import (
 	ArrowType,
-	ChoiceType as Choice,
-	ColorType as Color,
+	ChoiceType,
+	ColorType,
 	CompositeArray,
-	CompositeType as Composite,
-	CountryType as Country,
-	CurrencyType as Currency,
-	DateRangeType as DateRange,
-	DateTimeRangeType as DateTimeRange,
-	EmailType as Email,
-	EncryptedType as Encrypted,
+	CompositeType,
+	CountryType,
+	CurrencyType,
+	DateRangeType,
+	DateTimeRangeType,
+	EmailType,
+	EncryptedType,
 	instrumented_list,
 	InstrumentedList,
 	IntRangeType as IntRange,
@@ -78,6 +78,7 @@ from sqlalchemy_utils.types import (
 	LocaleType as Locale,
 	LtreeType as Ltree,
 	NumericRangeType as NumericRange,
+	Password as PasswordMutable,
 	PasswordType as BasePasswordType,
 	PhoneNumberType as BasePhoneNumberType,
 	PhoneNumberParseException,
@@ -87,7 +88,7 @@ from sqlalchemy_utils.types import (
 	ScalarListType as ScalarList,
 	TimezoneType as Timezone,
 	TSVectorType as TSVector,
-	URLType as URL,
+	URLType,
 	WeekDaysType as WeekDays,
 )
 
@@ -103,6 +104,47 @@ from datetime import datetime
 from sqlalchemy_utils import types
 from flex import carbon
 from flex.conf import config
+
+
+class Choice(ChoiceType):
+	pass
+
+
+class Color(ColorType):
+	pass
+
+
+class Country(CountryType):
+	pass
+
+
+class Currency(CurrencyType):
+	pass
+
+
+class Composite(CompositeType):
+	pass
+
+
+class DateRange(DateRangeType):
+	pass
+
+
+class DateTimeRange(DateTimeRangeType):
+	pass
+
+
+class Encrypted(EncryptedType):
+	pass
+
+
+class Email(EmailType):
+	pass
+
+
+class URL(URLType):
+	pass
+
 
 
 class Carbon(types.ArrowType):
@@ -151,6 +193,8 @@ class Password(BasePasswordType):
 
 		kwargs['onload'] = load_config
 		super(Password, self).__init__(max_length, **kwargs)
+
+PasswordMutable.associate_with(Password)
 
 
 

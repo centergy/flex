@@ -7,35 +7,37 @@ class ListModelMixin(object):
 
 	def list(self, *args, **kwargs):
 		data = self.get_list()
-		self.payload.data = self.get_serializer().dump(data, many=True).data
+		if data is not None:
+			self.payload.data = self.get_serializer().dump(data, many=True).data
 
 
 class CreateModelMixin(object):
 	"""Create a model instance."""
 
-	def get_success_status(self):
-		return 201
+	create_success_status = 201
 
-	def get_payload_data(self, obj):
+	def get_create_success_data(self, obj):
 		if self.lookup_field and hasattr(obj, self.lookup_field):
 			key = self.lookup_kwarg or self.lookup_field
-			return { key : getattr(obj, self.lookup_field) }
+			return { key : str(getattr(obj, self.lookup_field)) }
 
-	def perform_create(self, data):
-		obj = self.manager.create(data)
-
-	def create(self, *args, **kwargs):
-		data, errors = self.get_serializer().loads(self.request.input)
-		if errors:
-			return self.abort(400, errors)
-
-		obj = self.perform_create(data)
+	def on_create_success(self, obj):
 		if obj is not None:
-			data = self.get_payload_data(obj)
+			data = self.get_create_success_data(obj)
 			if data is not None:
 				self.payload.data = data
+		if self.create_success_status:
+			self.payload.status = self.create_success_status
 
-		self.payload.status = self.get_success_status()
+	def perform_create(self, data):
+		obj = self.manager.create(**data)
+		self.manager.db.commit()
+		return obj
+
+	def create(self, *args, **kwargs):
+		data = self.get_serializer(strict=True).load(self.request.input).data
+		obj = self.perform_create(data)
+		self.on_create_success(obj)
 
 
 
@@ -44,6 +46,5 @@ class RetrieveModelMixin(object):
 
 	def retrieve(self, *args, **kwargs):
 		obj = self.get_object()
-		if obj is None:
-			self.abort(404)
-		self.payload.data = self.get_serializer().dump(obj).data
+		if obj is not None:
+			self.payload.data = self.get_serializer().dump(obj).data

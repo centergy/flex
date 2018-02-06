@@ -2,6 +2,7 @@ from sqlalchemy.ext.mutable import (
 	Mutable, MutableDict, MutableList, MutableSet, MutableComposite
 )
 from flex.datastructures import AttrDict
+from sqlalchemy.dialects import postgresql as pg
 
 
 class MutableAttrDict(Mutable, AttrDict):
@@ -24,3 +25,6 @@ class MutableAttrDict(Mutable, AttrDict):
 			return Mutable.coerce(key, value)
 		else:
 			return value
+
+
+MutableAttrDict.associate_with(pg.HSTORE)

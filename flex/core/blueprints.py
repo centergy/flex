@@ -1,8 +1,13 @@
+import os
 import sys
+import inspect
 from flask import Blueprint as BaseBlueprint
 from flask.blueprints import BlueprintSetupState as BaseBlueprintSetupState
-from ..utils.module_loading import import_string
+from ..utils.module_loading import import_string, import_strings
 from . import signals
+
+
+URLS_MODULES = ['.urls', '.views']
 
 
 class BlueprintSetupState(BaseBlueprintSetupState):
@@ -75,8 +80,12 @@ class Blueprint(BaseBlueprint):
 	addons = ()
 	cli_commands = ()
 
-	def __init__(self, name, import_name, addons=None, cli=None, **blueprint_options):
+	def __init__(self, name, import_name, addons=None, cli=None,
+			urlconf=URLS_MODULES, **blueprint_options):
 		super(Blueprint, self).__init__(name, import_name, **blueprint_options)
+
+		self.urls_modules = urlconf
+
 		self.addons = tuple(self.addons or ()) + tuple(addons or ())
 		self.cli_commands = tuple(self.cli_commands or ()) + tuple(cli or ())
 		# self.childern = {}
@@ -122,7 +131,17 @@ class Blueprint(BaseBlueprint):
 			else:
 				app.add_cli_command(name, command)
 
+	def _import_urls_module(self):
+		if inspect.isfunction(self.urls_modules):
+			mods = self.urls_modules()
+		else:
+			mods = self.urls_modules
+
+		if mods:
+			import_strings(mods, self.import_name, silent=True)
+
 	def register(self, app, options, first_registration=False):
+		self._import_urls_module()
 		signals.blueprint_registering.send(self, app=app, options=options,
 									first_registration=first_registration)
 

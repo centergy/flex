@@ -80,6 +80,10 @@ class Manager(object):
 		if context is not None:
 			self.context.update(context)
 
+	@property
+	def _concrete(self):
+		return self.model_class._opts.concrete
+
 	def new_query(self, *args, **kwargs):
 		cls = self.model_class._opts.query_class
 		return cls(args or self.model_class, self.db.session, **kwargs)
@@ -120,25 +124,16 @@ class Manager(object):
 			setattr(model, k, v)
 		return model
 
-	def new_entity(self, **data):
+	def new_entity(self, data):
 		return self.model_class(**data)
 
 	def new(self, **data):
-		return self.apply_context_data(self.new_entity(**data))
+		return self.apply_context_data(self.new_entity(data))
 
-	def create(self, *args, **kwargs):
-		if len(args) > 1:
-			raise TypeError('expected at most 1 positional arg, got %d' % len(args))
-
-		data = dict(args[0]) if args else kwargs
-		if args and kwargs:
-			data.update(kwargs)
-		return self.create_model(data)
-
-	def create_model(self, data):
-		model = self.new(**data)
-		model.save()
-		return model
+	def create(self, **data):
+		entity = self.new(**data)
+		entity.save(db=self.db)
+		return entity
 
 	# def default_update_data(self):
 	# 	return {}

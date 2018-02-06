@@ -12,23 +12,34 @@ def import_module(name, package=None):
 def import_string(import_name, package=None, *, silent=False):
 	"""Imports an object or module based on a string.
 	"""
-	path = import_name.rsplit('.', 1)
 	try:
-		module = import_module(path[0], package=package)
+		return import_module(import_name, package=package)
 	except ImportError as e:
-		if not silent:
+		if '.' not in import_name:
+			if silent and e.name.endswith(import_name):
+				return
 			raise e
-		return
 
-	if len(path) == 1:
-		return module
+	path, *item = import_name.rsplit('.', 1)
+	path, item = path or '.'+''.join(item), path and ''.join(item)
 
 	try:
-		return getattr(module, path[-1], None) or import_module(import_name, package)
+		module = import_module(path, package=package)
+		if not item:
+			return module
 	except ImportError as e:
+		if silent and e.name.endswith(path.lstrip('.')):
+			return
+		raise e
+
+	try:
+		return getattr(module, item)
+	except AttributeError as e:
 		if not silent:
-			raise e
-		return
+			raise AttributeError(
+				'Module %s has no attribute %s.' % (module.__name__, item)
+			 ) from e
+
 
 
 def import_strings(value, package=None, *, silent=False):

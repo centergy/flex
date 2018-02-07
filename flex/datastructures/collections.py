@@ -256,8 +256,8 @@ class AttrBag(object):
 	def __getattr__(self, key):
 		try:
 			return self.__bag__[key]
-		except KeyError:
-			raise AttributeError(key)
+		except KeyError as e:
+			raise AttributeError(key) from e
 
 	def __setattr__(self, key, value):
 		self.__bag__[key] = value
@@ -265,8 +265,8 @@ class AttrBag(object):
 	def __delattr__(self, key):
 		try:
 			del self.__bag__[key]
-		except KeyError:
-			raise AttributeError(key)
+		except KeyError as e:
+			raise AttributeError(key) from e
 
 	def __getstate__(self):
 		return self.__bag__

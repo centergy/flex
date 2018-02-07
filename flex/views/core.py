@@ -5,6 +5,7 @@ from flask.views import View as FlaskView
 from ..utils import json
 from flask import request, current_app, session
 from werkzeug.datastructures import Headers
+from ..core.exc import ImproperlyConfigured
 from ..http import exc, status, Payload, Response
 from ..utils.decorators import cached_property
 from ..http.status import is_http_status_code
@@ -43,6 +44,7 @@ def is_instance_method(method):
 class ViewType(type):
 
 	def __new__(mcls, name, bases, dct):
+		dct.setdefault('endpoint', None)
 		cls = super(ViewType, mcls).__new__(mcls, name, bases, dct)
 		if 'methods' not in dct:
 			methods = set(cls.methods or [])
@@ -75,6 +77,8 @@ class View(FlaskView, metaclass=ViewType):
 
 	decorators = ()
 
+	endpoint = None
+
 	payload_class = Payload
 
 	mimetype = None
@@ -100,7 +104,35 @@ class View(FlaskView, metaclass=ViewType):
 		return self.payload.headers
 
 	@classmethod
-	def as_view(cls, name, *class_args, **class_kwargs):
+	def _get_default_view(cls):
+		if not hasattr(cls, '_default_view'):
+			def view(*args, **kwargs):
+				self = view.view_class()
+				response = self(*args, **kwargs)
+				return response
+
+			name = cls.endpoint or cls.__name__
+			if cls.decorators:
+				view.__name__ = name
+				view.__module__ = cls.__module__
+				for decorator in cls.decorators:
+					view = decorator(view)
+
+			# We attach the view class to the view function for two reasons:
+			# first of all it allows us to easily figure out what class-based
+			# view this thing came from, secondly it's also used for instantiating
+			# the view class so you can actually replace it with something else
+			# for testing purposes and debugging.
+			view.view_class = cls
+			view.__name__ = name
+			view.__doc__ = cls.__doc__
+			view.__module__ = cls.__module__
+			view.methods = cls.methods
+			cls._default_view = view
+		return cls._default_view
+
+	@classmethod
+	def as_view(cls, name=None, *class_args, **class_kwargs):
 		"""Converts the class into an actual view function that can be used
 		with the routing system.  Internally this generates a function on the
 		fly which will instantiate the :class:`View` on each request and call
@@ -109,9 +141,17 @@ class View(FlaskView, metaclass=ViewType):
 		The arguments passed to :meth:`as_view` are forwarded to the
 		constructor of the class.
 		"""
+		if name is None:
+			if class_args or class_kwargs:
+				raise TypeError(
+						'View name is required when class_args or class_kwargs '
+						'are provided was not set on view. %s.')
+			else:
+				return cls._get_default_view()
+
 		def view(*args, **kwargs):
 			self = view.view_class(*class_args, **class_kwargs)
-			response = self.handle(*args, **kwargs)
+			response = self(*args, **kwargs)
 			return response
 
 		if cls.decorators:
@@ -165,6 +205,13 @@ class View(FlaskView, metaclass=ViewType):
 	def build_response(self):
 		return self.payload.to_response()
 
+	def http_method_not_allowed(self, *args, **kwargs):
+		"""
+		If `request.method` does not correspond to a handler method,
+		determine what kind of exception to raise.
+		"""
+		return self.abort(status.HTTP_405_METHOD_NOT_ALLOWED)
+
 	def initial(self, request, *args, **kwargs):
 		"""Runs anything that needs to occur prior to calling the method handler.
 		"""
@@ -207,7 +254,7 @@ class View(FlaskView, metaclass=ViewType):
 	# Note: Views are made CSRF exempt from within `as_view` as to prevent
 	# accidental removal of this exemption in cases where `handle` needs to
 	# be overridden.
-	def handle(self, *args, **kwargs):
+	def __call__(self, *args, **kwargs):
 		"""
 		`.dispatch()` is pretty much the same as Django's regular dispatch,
 		but with extra hooks for startup, finalize, and exception handling.
@@ -233,11 +280,3 @@ class View(FlaskView, metaclass=ViewType):
 			response = self.handle_exception(e)
 
 		return self.finalize_response(request, response, *args, **kwargs)
-
-	def http_method_not_allowed(self, *args, **kwargs):
-		"""
-		If `request.method` does not correspond to a handler method,
-		determine what kind of exception to raise.
-		"""
-		return self.abort(status.HTTP_405_METHOD_NOT_ALLOWED)
-

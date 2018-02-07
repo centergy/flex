@@ -120,6 +120,21 @@ class Payload(object):
 	def render(self):
 		return self.renderer(self)
 
+	def __getitem__(self, key):
+		try:
+			return self._body[key]
+		except KeyError as e:
+			raise KeyError(key) from e
+
+	def __delitem__(self, key):
+		try:
+			del self._body[key]
+		except KeyError as e:
+			raise KeyError(key) from e
+
+	def __setitem__(self, key, value):
+		self._body[key] = value
+
 	def __repr__(self):
 		return '%s({ body: %r, response: %r, context: %r })' \
 		% (self.__class__.__name__, self.body,

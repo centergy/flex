@@ -5,7 +5,11 @@ from flask import Blueprint as BaseBlueprint
 from flask.blueprints import BlueprintSetupState as BaseBlueprintSetupState
 from ..utils.module_loading import import_string, import_strings
 from . import signals
+from flask.helpers import safe_join
+from flex.conf import config
 
+
+_nothing = object()
 
 URLS_MODULES = ['.urls', '.views']
 
@@ -80,14 +84,23 @@ class Blueprint(BaseBlueprint):
 	addons = ()
 	cli_commands = ()
 
-	def __init__(self, name, import_name, addons=None, cli=None,
-			urlconf=URLS_MODULES, **blueprint_options):
+	def __init__(self, name, import_name, app=None, addons=None, cli=None,
+			urlconf=URLS_MODULES, public_folder=None, static_folder=None,
+			**blueprint_options):
+
+		if public_folder is not None and  static_folder is None:
+			public_folder = name if public_folder == True else public_folder
+			static_folder = os.path.join(config.PUBLIC_PATH, public_folder)
+		blueprint_options['static_folder'] = static_folder
+
 		super(Blueprint, self).__init__(name, import_name, **blueprint_options)
 
 		self.urls_modules = urlconf
 
 		self.addons = tuple(self.addons or ()) + tuple(addons or ())
 		self.cli_commands = tuple(self.cli_commands or ()) + tuple(cli or ())
+		if app is not None:
+			self.init_app(app)
 		# self.childern = {}
 
 	@property

@@ -83,7 +83,7 @@ class PhoneNumber(String):
 	@property
 	def region(self):
 		if self._region is None:
-			return config.top.get('LOCALE_TERRITORY') or self.default_region
+			return config.top.get('LOCALE_TERRITORY', self.default_region)
 		return self._region
 
 	def _deserialize(self, value, attr, data):
@@ -97,9 +97,11 @@ class PhoneNumber(String):
 
 		try:
 			phn = _PhoneNumber(value, self.region)
+		except PhoneNumberParseException as e:
+			self.fail('invalid')
+		else:
 			if phn.is_valid_number():
 				return phn
-		except PhoneNumberParseException as e:
-			pass
-		finally:
 			self.fail('invalid')
+
+

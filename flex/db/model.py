@@ -99,10 +99,10 @@ class Options(object):
 		the model is part of a polymorphic inheritance tree. Otherwise, the
 		model class is returned.
 		"""
-		for c in self.model_class.mro():
-			if c is not BaseModel and isinstance(c, DeclarativeMeta)\
-				and not has_inherited_table(c):
-				return c
+		for cls in self.model_class.mro():
+			if cls is not BaseModel and isinstance(cls, DeclarativeMeta)\
+				and not has_inherited_table(cls):
+				return cls
 
 	@locked_cached_property
 	def query_class(self):
@@ -336,8 +336,8 @@ class BaseModel(ModelBase):
 		return cls.columns()[name]
 
 	def _exists(self):
-		ident = self.class_mapper().identity_key_from_instance(self)
-		for pk in ident[1]:
+		ident = self.class_mapper().primary_key_from_instance(self)
+		for pk in ident:
 			if pk is None:
 				return False
 		return True

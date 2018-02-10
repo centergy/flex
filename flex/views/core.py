@@ -56,12 +56,12 @@ class ViewType(type):
 			# the base class or another subclass of a base method view
 			# that does not introduce new methods).
 			if methods:
-				cls.methods = sorted(methods)
+				cls.methods = list(sorted(methods))
 
 		decorators = []
 		for c in cls.mro():
 			if hasattr(c, 'decorators') and isinstance(c.decorators, (list, tuple)):
-				for d in c.decorators:
+				for d in reversed(c.decorators):
 					if d not in decorators:
 						decorators.append(d)
 

@@ -1,81 +1,22 @@
 import os
 import sys
 import inspect
+from functools import partial
+from flask.app import setupmethod
 from flask import Blueprint as BaseBlueprint
-from flask.blueprints import BlueprintSetupState as BaseBlueprintSetupState
 from ..utils.module_loading import import_string, import_strings
 from . import signals
 from flask.helpers import safe_join
 from flex.conf import config
-
+from flex.utils.decorators import export, locked_cached_property
 
 _nothing = object()
 
-URLS_MODULES = ['.urls', '.views']
+URL_CONF_MODULES = ('.urls', '.views')
+LAZY_MODULES = ('.receivers',)
 
-
-class BlueprintSetupState(BaseBlueprintSetupState):
-	"""Temporary holder object for registering a blueprint with the
-	application.  An instance of this class is created by the
-	:meth:`~flask.Blueprint.make_setup_state` method and later passed
-	to all register callback functions.
-	"""
-
-	def __init__(self, blueprint, app, options, first_registration, parent=None):
-		#: a reference to the current application
-		self.app = app
-
-		#: a reference to the blueprint that created this setup state.
-		self.blueprint = blueprint
-
-		#: a dictionary with all options that were passed to the
-		#: :meth:`~flask.Flask.register_blueprint` method.
-		self.options = options
-
-		#: as blueprints can be registered multiple times with the
-		#: application and not everything wants to be registered
-		#: multiple times on it, this attribute can be used to figure
-		#: out if the blueprint was registered in the past already.
-		self.first_registration = first_registration
-
-		self.parent = parent
-
-		subdomain = self.options.get('subdomain')
-		if subdomain is None:
-			subdomain = self.blueprint.subdomain
-
-		#: The subdomain that the blueprint should be active for, ``None``
-		#: otherwise.
-		self.subdomain = subdomain
-
-		url_prefix = self.options.get('url_prefix')
-		if url_prefix is None:
-			url_prefix = self.blueprint.url_prefix
-
-		#: The prefix that should be used for all URLs defined on the
-		#: blueprint.
-		self.url_prefix = url_prefix
-
-		#: A dictionary with URL defaults that is added to each and every
-		#: URL that was defined with the blueprint.
-		self.url_defaults = dict(self.blueprint.url_values_defaults)
-		self.url_defaults.update(self.options.get('url_defaults', ()))
-
-	def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
-		"""A helper method to register a rule (and optionally a view function)
-		to the application.  The endpoint is automatically prefixed with the
-		blueprint's name.
-		"""
-		if self.url_prefix:
-			rule = self.url_prefix + rule
-		options.setdefault('subdomain', self.subdomain)
-		if endpoint is None:
-			endpoint = _endpoint_from_view_func(view_func)
-		defaults = self.url_defaults
-		if 'defaults' in options:
-			defaults = dict(defaults, **options.pop('defaults'))
-		self.app.add_url_rule(rule, '%s.%s' % (self.blueprint.name, endpoint),
-							  view_func, defaults=defaults, **options)
+def _(self):
+	pass
 
 
 
@@ -83,10 +24,13 @@ class Blueprint(BaseBlueprint):
 
 	addons = ()
 	cli_commands = ()
+	_urlconf = URL_CONF_MODULES
+	_lazy_modules = LAZY_MODULES
+	warn_on_modifications = False
 
 	def __init__(self, name, import_name, app=None, addons=None, cli=None,
-			urlconf=URLS_MODULES, public_folder=None, static_folder=None,
-			**blueprint_options):
+			urlconf=None, public_folder=None, static_folder=None,
+			lazy_modules=None, **blueprint_options):
 
 		if public_folder is not None and  static_folder is None:
 			public_folder = name if public_folder == True else public_folder
@@ -95,15 +39,37 @@ class Blueprint(BaseBlueprint):
 
 		super(Blueprint, self).__init__(name, import_name, **blueprint_options)
 
-		self.urls_modules = urlconf
+		self._num_registrations = 0
+
+		# urlconf = urlconf or self._urlconf
+		if urlconf is not None:
+			self.urlconf = urlconf
 
 		self.addons = tuple(self.addons or ()) + tuple(addons or ())
 		self.cli_commands = tuple(self.cli_commands or ()) + tuple(cli or ())
+
+		lazy_modules = tuple(self._lazy_modules or ()) + tuple(lazy_modules or ())
+
+		self.on_register(partial(
+					import_strings, lazy_modules,
+					self.import_name, silent=True
+				), once=True)
+
+		urlconf = urlconf or self._urlconf
+
+		if not callable(urlconf):
+			self.on_register(partial(
+					import_strings, urlconf,
+					self.import_name, silent=True
+				), once=True)
+		else:
+			self.on_register(urlconf, withstate=True)
+
 		if app is not None:
 			self.init_app(app)
 		# self.childern = {}
 
-	@property
+	@locked_cached_property
 	def root_module(self):
 		return sys.modules.get(self.import_name)
 
@@ -114,7 +80,7 @@ class Blueprint(BaseBlueprint):
 	def init_addons(self, app):
 		for addon in self.addons:
 			if isinstance(addon, str):
-				addon = import_string(addon, self.root_module)
+				addon = import_string(addon, self.import_name)
 			addon.init_app(app)
 
 	def register_cli_commands(self, app):
@@ -137,28 +103,42 @@ class Blueprint(BaseBlueprint):
 				)
 
 			if isinstance(command, str):
-				command = import_string(command, self.root_module)
+				command = import_string(command, self.import_name)
 
 			if not name:
 				app.add_cli_command(command)
 			else:
 				app.add_cli_command(name, command)
 
-	def _import_urls_module(self):
-		if inspect.isfunction(self.urls_modules):
-			mods = self.urls_modules()
-		else:
-			mods = self.urls_modules
+	def on_register(self, fn=None, *, once=False, first_registration=True,
+					withapp=False, withstate=False):
+		def decorator(func):
+			def wrapper(state):
+				if once and self._num_registrations > 0:
+					return
+				if not first_registration or state.first_registration:
+					if withapp:
+						func(state.app)
+					elif withstate:
+						func(state)
+					else:
+						func()
+			self.record(wrapper)
+			return func
 
-		if mods:
-			import_strings(mods, self.import_name, silent=True)
+		if withapp == True == withstate:
+			raise TypeError(
+				'Args withapp and withstate cannot both be True just 1.'
+			)
+		return decorator if fn is None else decorator(fn)
 
 	def register(self, app, options, first_registration=False):
-		self._import_urls_module()
 		signals.blueprint_registering.send(self, app=app, options=options,
 									first_registration=first_registration)
 
 		super(Blueprint, self).register(app, options, first_registration)
+
+		self._num_registrations += 1
 
 		signals.blueprint_registered.send(self, app=app, options=options,
 									first_registration=first_registration)

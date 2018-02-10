@@ -3,7 +3,8 @@ import os
 import warnings
 import importlib
 from collections import MutableMapping, Mapping
-from importlib.util import find_spec as importlib_find
+from importlib.util import find_spec
+
 
 
 def import_module(name, package=None):
@@ -56,18 +57,25 @@ def import_strings(value, package=None, *, silent=False):
 	return value
 
 
+# def package_path(module):
+# 	if isinstance(module, str):
+# 		module = sys.modules.get(module) or import_string(module)
+# 	path = getattr(module, name, default)
 
-def module_has_submodule(package, module_name):
+
+def module_has_submodule(package, module_name, *, silent=False):
 	"""See if 'module' is in 'package'."""
 	try:
-		package_name = package.__name__
-		package_path = package.__path__
-	except AttributeError:
-		# package isn't a package.
+		pkg = import_string(package) if isinstance(package, str) else package
+		pkg_name = pkg.__name__
+		pkg_path = pkg.__path__
+	except (AttributeError, ImportError) as e:
+		if not silent:
+			raise ValueError('%r is not a valid package.' % (package,)) from e
 		return False
 
-	full_module_name = package_name + '.' + module_name
-	return importlib_find(full_module_name, package_path) is not None
+	return find_spec(module_name, pkg_name) is not None
+
 
 
 def module_dir(module):

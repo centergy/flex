@@ -63,13 +63,19 @@ class Kernel(Flask):
 	#: The JSON decoder class to use.  Defaults to :class:`~flex.utils.json.JSONDecoder`.
 	json_decoder = json.JSONDecoder
 
-	def __init__(self, import_name, static_path=None, static_url_path=None,
-				static_folder='static', template_folder='templates',
+	def __init__(self, import_name, static_url_path=None,
+				public_folder=None, static_folder=None, template_folder='templates',
 				instance_path=None,	instance_relative_config=False,
 				root_path=None):
 
-		kwargs = dict(
-			static_path=static_path, static_url_path=static_url_path,
+
+		if public_folder is not None and  static_folder is None:
+			public_folder = '' if public_folder is True else public_folder
+			static_folder = os.path.join(global_config.PUBLIC_PATH, public_folder)
+		elif static_folder is None:
+			static_folder = 'static'
+
+		kwargs = dict(static_url_path=static_url_path,
 			static_folder=static_folder,template_folder=template_folder,
 			instance_path=instance_path, root_path=root_path,
 			instance_relative_config=instance_relative_config
@@ -136,24 +142,32 @@ class Kernel(Flask):
 	def init_default_addons(self):
 		"""Initialize addons configured under the ADDONS config key.
 		"""
-		for addon in self.config.get('DEFAULT_ADDONS', ()):
+		for addon in import_strings(self.config.get('DEFAULT_ADDONS', ())):
 			self.init_addon(addon)
 
 	@preboot_method
 	def init_configured_addons(self):
 		"""Initialize addons configured under the ADDONS config key.
 		"""
-		for addon in self.config.get('ADDONS', ()):
-			self.init_addon(addon)
+		try:
+			addons = import_strings(self.config.get('ADDONS', ()))
+		except ImportError as e:
+			raise ImproperlyConfigured(
+					'ADDONS configuration for kernel: %r.' % self.name
+				) from e
+		else:
+			for addon in addons:
+				self.init_addon(addon)
 
 	@setupmethod
 	def init_addon(self, addon):
 		if isinstance(addon, str):
-			# try:
-			addon = import_string(addon)
-			# except ImportError:
-			# 	traceback.print_exc()
-			# 	raise ImproperlyConfigured('Could not load addon %s.' % addon)
+			try:
+				addon = import_string(addon)
+			except Exception as e:
+				raise ImproperlyConfigured(
+						'Addon %r for kernel %r.' % (addon, self.name)
+					) from e
 
 		if inspect.isfunction(addon):
 			addon(self)

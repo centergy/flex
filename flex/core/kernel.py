@@ -134,9 +134,18 @@ class Kernel(Flask):
 		the package.
 		"""
 		prefix, package_path = find_package(self.import_name)
+		dir_name = self.get_instance_path_dir_name()
 		if prefix is None:
-			return os.path.join(package_path, '.local')
-		return os.path.join(prefix, 'var', '.%s-local' % self.name)
+			rv = os.path.abspath(os.path.join(package_path, dir_name))
+			if not os.path.exists(rv):
+				cwd = os.getcwd().rstrip('/')
+				package_path = package_path.rstrip('/')
+				if cwd != package_path and package_path.startswith(cwd):
+					return os.path.abspath(os.path.join(cwd, dir_name))
+		return os.path.abspath(os.path.join(prefix, 'var', dir_name))
+
+	def get_instance_path_dir_name(self):
+		return '.local/%s' % self.name
 
 	@preboot_method
 	def init_default_addons(self):
@@ -244,6 +253,8 @@ class Kernel(Flask):
 	def run(self, host=None, port=None, debug=None, **options):
 		signals.app_starting.send(
 			self, host=host, port=port, debug=debug, options=options)
+		if 'ssl_context' not in options or options['ssl_context'] is None:
+			options['ssl_context'] = self.config.get('SSL_CERTS')
 		return super(Kernel, self).run(host, port, debug, **options)
 
 	@postboot_method

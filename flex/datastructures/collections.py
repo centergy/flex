@@ -6,7 +6,7 @@ __all__ = []
 
 NOTHING = object()
 
-
+@export
 class AttrMap(Mapping):
 
 	__slots__ = ()
@@ -20,6 +20,7 @@ class AttrMap(Mapping):
 				% (self.__class__.__name__, name)
 			)
 
+@export
 class MutableAttrMap(MutableMapping, AttrMap):
 
 	__slots__ = ()

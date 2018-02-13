@@ -4,6 +4,7 @@ from sqlalchemy_utils import (
 	PhoneNumberParseException, PhoneNumber as _PhoneNumber
 )
 
+from flex.locale import locale
 from flex.db import types
 from flex.conf import config
 from flex import carbon
@@ -69,31 +70,33 @@ class Enum(Field):
 class PhoneNumber(String):
 
 	default_error_messages = {
-		'required': 'This field is required.',
+		# 'required': 'This field is required.',
 		'type': 'Invalid input type.', # used by Unmarshaller
 		'null': 'This field is required.',
 		'invalid': "This field must be a valid phone number ('+XXXXXXXXXX', or'0XXXXXXXXX' if local). 15 digits max.",
 	}
-	default_region = 'US'
+	default_region = 'KE'
 
 	def __init__(self, region=None, **kwargs):
+		kwargs.setdefault('required', False)
+		kwargs.setdefault('allow_none', True)
 		super(PhoneNumber, self).__init__(**kwargs)
 		self._region = region
 
 	@property
 	def region(self):
 		if self._region is None:
-			return config.top.get('LOCALE_TERRITORY', self.default_region)
+			return locale.territory or self.default_region
 		return self._region
 
 	def _deserialize(self, value, attr, data):
 		value = super(PhoneNumber, self)._deserialize(value, attr, data)
 
-		value = value and value.strip()
+		value = value and str(value).strip()
 		if not value:
-			if not self.required:
-				return None
-			self.fail('required')
+			if self.required:
+				self.fail('required')
+			return None if self.allow_none else ''
 
 		try:
 			phn = _PhoneNumber(value, self.region)
@@ -103,5 +106,35 @@ class PhoneNumber(String):
 			if phn.is_valid_number():
 				return phn
 			self.fail('invalid')
+
+
+class Money(Decimal):
+	"""docstring for Money"""
+
+	def __init__(self, places=2, rounding=None, thousand_sep=True, **kwargs):
+		kwargs.setdefault('required', False)
+		kwargs.setdefault('allow_none', False)
+		super(Money, self).__init__(places, rounding, **kwargs)
+		self.thousand_sep = thousand_sep
+
+	# override Number
+	def _format_num(self, value):
+		if value is None:
+			return None
+
+		if isinstance(value, str):
+			if not value:
+				if self.allow_none:
+					return None
+				if self.required:
+					self.fail('required')
+
+			value = value.replace(',', '')
+
+		return super(Money, self)._format_num(value)
+
+	def _to_string(self, value):
+		sep = ',' if self.thousand_sep is True else self.thousand_sep or ''
+		return format(value, '%sf' % (sep,))
 
 

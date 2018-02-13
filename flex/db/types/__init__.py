@@ -104,6 +104,7 @@ from datetime import datetime
 from sqlalchemy_utils import types
 from flex import carbon
 from flex.conf import config
+from flex.locale import locale
 
 
 class Choice(ChoiceType):
@@ -199,7 +200,7 @@ PasswordMutable.associate_with(Password)
 
 
 class PhoneNumber(BasePhoneNumberType):
-	default_region = 'US'
+	default_region = 'KE'
 
 	def __init__(self, region=None, max_length=20, *args, **kwargs):
 		self._region = None
@@ -208,7 +209,7 @@ class PhoneNumber(BasePhoneNumberType):
 	@property
 	def region(self):
 		if self._region is None:
-			return config.top.get('LOCALE_TERRITORY') or self.default_region
+			return locale.territory or self.default_region
 		return self._region
 
 	@region.setter

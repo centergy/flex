@@ -9,29 +9,26 @@ from flask.signals import (
 	appcontext_pushed,
 	appcontext_popped,
 	message_flashed,
-	Namespace
 )
+from flex.signal import signal
 
 
-
-_signals = Namespace()
-
-app_booting = _signals.signal('app-booting')
-app_booted = app_ready = _signals.signal('app-booted')
+app_booting = signal('app_booting')
+app_booted = app_ready = signal('app_booted')
 
 # app_registering_blueprint = _signals.signal('app-registering-blueprint')
 # app_registered_blueprint = _signals.signal('app-registered-blueprint')
 
-app_starting = _signals.signal('app-started')
-app_started = _signals.signal('app-started')
+app_starting = signal('app_started')
+app_started = signal('app_started')
 
-blueprint_registering = _signals.signal('blueprint-registering')
-blueprint_registered = _signals.signal('blueprint-registered')
+blueprint_registering = signal('blueprint_registering')
+blueprint_registered = signal('blueprint_registered')
 
 
-session_starting = _signals.signal('session-starting')
-session_started = _signals.signal('session-started')
-session_ending = _signals.signal('session-ending')
-session_ended = _signals.signal('session-ended')
+session_starting = signal('session_starting')
+session_started = signal('session_started')
+session_ending = signal('session_ending')
+session_ended = signal('session_ended')
 
 

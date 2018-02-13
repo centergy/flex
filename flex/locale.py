@@ -34,7 +34,7 @@ class LocaleProvider(object):
 			code = locale_selector.pipe(ctx.app, self.config.code)
 			tzname = timezone_selector.pipe(ctx.app, self.config.timezone)
 			if not code:
-				code = '_'.join((self.config.language, self.config.teritory))
+				code = '_'.join((self.config.language, self.config.territory))
 			key = (code, tzname or self.config.timezone)
 			setattr(ctx, '_locale_key', key)
 		else:
@@ -55,7 +55,7 @@ class Locale(BaseLocale):
 @export
 class LocaleManager(Proxy):
 
-	__slots__ = ()
+	__slots__ = ('_app')
 
 	_config_prefix = 'LOCALE_'
 
@@ -64,12 +64,15 @@ class LocaleManager(Proxy):
 		# code_sep='_',
 		timezone='UTC',
 		language='en',
-		teritory='KE',
+		territory='KE',
 		# CLASS='flex.locale.Locale'
 	)
 
-	def __init__(self):
+	def __init__(self, app=None):
 		super(LocaleManager, self).__init__(None, 'Locale')
+		if app is not None:
+			self.init_app(app)
+		object.__setattr__(self, '_app', app)
 
 	def _get_current_object(self):
 		try:

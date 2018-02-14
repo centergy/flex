@@ -7,7 +7,7 @@ from marshmallow import (
 import marshmallow_sqlalchemy as marsh_sa
 from flex.http.exc import ValidationError as HttpValidationError
 from ..db import db
-from . import fields, validate
+from . import fields, validate, sanitizers
 
 
 class SchemaOpts(BaseSchemaOpts):

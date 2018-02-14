@@ -1,4 +1,5 @@
-from marshmallow.fields import *
+import re
+from .base import *
 from marshmallow.fields import DateTime as BaseDateTime
 from sqlalchemy_utils import (
 	PhoneNumberParseException, PhoneNumber as _PhoneNumber
@@ -12,12 +13,36 @@ from flex import carbon
 import phonenumbers
 
 
+class Slug(String):
+
+	default_error_messages = {
+		'invalid': 'Field may only contain letters, numbers, underscores and hyphens.',
+		'invalid_unicode': 'Field may only contain Unicode letters, numbers, underscores and hyphens.',
+	}
+
+	ascii_re = r'^[-a-zA-Z0-9_]+\Z'
+	unicode_re = r'^[-\w]+\Z'
+
+	def __init__(self, *args, **kwargs):
+		self._unicode = kwargs.pop('unicode', False)
+		super(Slug, self).__init__(*args, **kwargs)
+		self.regex = self.unicode_re if self._unicode else self.ascii_re
+		self.regex = re.compile(self.regex)
+
+	def _deserialize(self, value, attr, obj):
+		value = super(Slug, self)._deserialize(value, attr, data)
+		if not bool(self.regex.search(value)):
+			self._unicode and self.fail('invalid_unicode') or self.fail('invalid')
+		return value
+
 
 class DateTime(BaseDateTime):
 
 	DATEFORMAT_SERIALIZATION_FUNCS = dict(
 		**BaseDateTime.DATEFORMAT_SERIALIZATION_FUNCS
 	)
+
+	blank_to_none = True
 
 	def __init__(self, format=None, local=None, load_local=None, **kwargs):
 		if local is not None:
@@ -28,6 +53,8 @@ class DateTime(BaseDateTime):
 
 
 class Carbon(DateTime):
+
+	blank_to_none = True
 
 	def _serialize(self, value, attr, obj):
 		if value and carbon.arrow and isinstance(value, carbon.arrow.Arrow):
@@ -44,6 +71,8 @@ class Carbon(DateTime):
 
 
 class Enum(Field):
+
+	blank_to_none = True
 
 	default_error_messages = {
 		'required': 'This field is required.',
@@ -76,10 +105,9 @@ class PhoneNumber(String):
 		'invalid': "This field must be a valid phone number ('+XXXXXXXXXX', or'0XXXXXXXXX' if local). 15 digits max.",
 	}
 	default_region = 'KE'
+	blank_to_none = True
 
 	def __init__(self, region=None, **kwargs):
-		kwargs.setdefault('required', False)
-		kwargs.setdefault('allow_none', True)
 		super(PhoneNumber, self).__init__(**kwargs)
 		self._region = region
 
@@ -92,12 +120,6 @@ class PhoneNumber(String):
 	def _deserialize(self, value, attr, data):
 		value = super(PhoneNumber, self)._deserialize(value, attr, data)
 
-		value = value and str(value).strip()
-		if not value:
-			if self.required:
-				self.fail('required')
-			return None if self.allow_none else ''
-
 		try:
 			phn = _PhoneNumber(value, self.region)
 		except PhoneNumberParseException as e:
@@ -109,11 +131,8 @@ class PhoneNumber(String):
 
 
 class Money(Decimal):
-	"""docstring for Money"""
 
 	def __init__(self, places=2, rounding=None, thousand_sep=True, **kwargs):
-		kwargs.setdefault('required', False)
-		kwargs.setdefault('allow_none', False)
 		super(Money, self).__init__(places, rounding, **kwargs)
 		self.thousand_sep = thousand_sep
 
@@ -123,12 +142,6 @@ class Money(Decimal):
 			return None
 
 		if isinstance(value, str):
-			if not value:
-				if self.allow_none:
-					return None
-				if self.required:
-					self.fail('required')
-
 			value = value.replace(',', '')
 
 		return super(Money, self)._format_num(value)

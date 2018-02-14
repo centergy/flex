@@ -1,99 +1,100 @@
-from tea.utils.encoding import force_text
-from tea.collections import yielder
 import six
+import sys
+from collections import Iterable
+from flex.utils.decorators import export
 
 
+@export
 class Sanitizer(object):
 
-	def __call__(self, *args, **kwargs):
-		return self.sanitize(*args, **kwargs)
+	__slots__ = ()
 
-	def sanitize(self, value):
-		msg = "Sanitizer method sanitize() not implemented in {}"
-		raise NotImplementedError(msg.format(self.__class__))
+	def __call__(self, value):
+		raise NotImplementedError(
+			"Sanitizer method sanitize() not implemented in %s."\
+			% self.__class__.__name__
+		)
 
 
+@export
 class strip(Sanitizer):
-	"""docstring for TrimWhitespaces"""
-	func_names = {
-		'' : 'strip',
-		'lr' : 'strip',
-		'rl' : 'strip',
-		'both' : 'strip',
-		'l' : 'lstrip',
-		'left' : 'lstrip',
-		'r' : 'rstrip',
-		'right' : 'rstrip',
-	}
-	def __init__(self, side=''):
-		self.func = self.func_names[side]
+	"""Wrapper for str.strip"""
 
-	def sanitize(self, value):
-		value = force_text(value, strings_only=True)
-		if isinstance(value, six.string_types):
-			func = getattr(value, self.func)
-			return func()
-		return value
+	__slots__ = ('chars',)
+
+	def __init__(self, chars=None):
+		self.chars = chars
+
+	def _strip(self, value):
+		return value.strip() if self.chars is None else value.strip(self.chars)
+
+	def __call__(self, value):
+		return self._strip(value) if isinstance(value, str) else value
 
 
+@export
 class lstrip(strip):
-	def __init__(self):
-		super(lstrip, self).__init__('l')
+
+	def _strip(self, value):
+		return value.lstrip() if self.chars is None else value.lstrip(self.chars)
 
 
+@export
 class rstrip(strip):
-	def __init__(self):
-		super(rstrip, self).__init__('r')
+
+	def _strip(self, value):
+		return value.rstrip() if self.chars is None else value.rstrip(self.chars)
 
 
+@export
 class split(Sanitizer):
-	
+
 	def __init__(self, sep=' ', coercer=str, sanitize=None, maxsplits=-1):
 		self.sep = sep
-		self.coercers = yielder(coercer)
+		self.coercers = _to_list(coercer)
 		self.maxsplits = maxsplits
-		self.sanitizers = yielder(sanitize)
-	
+		self.sanitizers = _to_list(sanitize)
+
 	def split(self, value):
 		return value.split(self.sep, self.maxsplits)
-	
+
 	def coerce(self, value):
 		for coercer in self.coercers:
 			value = coercer(value)
 		return value
-	
+
 	def isanitize(self, value):
 		for sanitizer in self.sanitizers:
-			sanitizer = _get_sanitizer(sanitizer)
 			value = sanitizer(value)
 		return value
 
-	def sanitize(self, value):
-		value = force_text(value, strings_only=True)
-		if isinstance(value, six.string_types):
-			rv = []
-			for v in self.split(value):
-				rv.append(self.isanitize(self.coerce(v)))
-			return rv
+	def __call__(self, value):
+		if isinstance(value, str):
+			value = [self.isanitize(self.coerce(v)) for v in self.split(value)]
 		return value
 
 
+@export
 class rsplit(split):
+
 	def split(self, value):
 		return value.rsplit(self.sep, self.maxsplits)
 
 
+@export
 class nonelike(Sanitizer):
+
 	like_values = set(('', 'none', 'None', 'NONE', 'null', 'Null', 'NULL', None))
 
 	def __init__(self, like_values=None):
 		if like_values:
 			self.like_values = like_values
 
-	def sanitize(self, value):
+	def __call__(self, value):
 		return None if value in self.like_values else value
-		
 
+
+@export
 class boollike(Sanitizer):
 	#  value will deserialize to `True`. primitive boolly
 	true_like = set(('t', 'T', 'true', 'True', 'TRUE', '1', 1, True))
@@ -106,7 +107,7 @@ class boollike(Sanitizer):
 		if false_like:
 			self.false_like = false_like
 
-	def sanitize(self, value):
+	def __call__(self, value):
 		if value in self.true_like:
 			return True
 		elif value in self.false_like:
@@ -115,5 +116,9 @@ class boollike(Sanitizer):
 
 
 
-def _get_sanitizer(obj):
-	return obj() if isinstance(obj, type) else obj
+def _to_list(x, default=(), ignore=six.string_types):
+	x = default if x is None else x
+	if isinstance(x, Iterable) and (not ignore or not isinstance(x, ignore)):
+		return list(x)
+	else:
+		return [x]

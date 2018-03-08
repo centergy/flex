@@ -89,6 +89,7 @@ class UpdateModelMixin(object):
 		return self.update(*args, **kwargs)
 
 
+
 class DestroyModelMixin(object):
 	"""
 	Destroy a model instance.

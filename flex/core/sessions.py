@@ -31,7 +31,7 @@ class Session(object):
 		flashed = lambda s: set(),
 		xflashed = lambda s: set(),
 		immortals = lambda s: set(),
-		permanent = False,
+		permanent = True,
 		lifespan = lambda s: timedelta(hours=24),
 		last_updated = lambda s: datetime.now()
 	)

@@ -29,7 +29,7 @@ class Slug(String):
 		self.regex = self.unicode_re if self._unicode else self.ascii_re
 		self.regex = re.compile(self.regex)
 
-	def _deserialize(self, value, attr, obj):
+	def _deserialize(self, value, attr, data):
 		value = super(Slug, self)._deserialize(value, attr, data)
 		if not bool(self.regex.search(value)):
 			self._unicode and self.fail('invalid_unicode') or self.fail('invalid')

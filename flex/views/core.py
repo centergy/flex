@@ -7,17 +7,25 @@ from flask import request, current_app, session
 from werkzeug.datastructures import Headers
 from ..core.exc import ImproperlyConfigured
 from ..http import exc, status, Payload, Response
-from ..utils.decorators import cached_property
+from ..utils.decorators import cached_property, export
 from ..http.status import is_http_status_code
+from ..helpers import uzi
 from .. import helpers
+
+from .options import BaseViewOptions, viewoption
+
 
 __all__ = [
 	'View',
 ]
 
 
+def has_own_attr(obj, name):
+	return name in obj.__dict__
+
 
 http_method_funcs = frozenset(['get', 'post', 'head', 'options', 'delete', 'put', 'trace', 'patch'])
+
 
 
 def declared_http_methods(cls):
@@ -36,16 +44,20 @@ def declared_http_methods(cls):
 	# 		yield name
 
 def is_instance_method(method):
-	argspec = inspect.getfullargspec(method)
-	args = argspec[0]
-	return args and args[0] == 'self'
+	if inspect.isfunction(method):
+		argspec = inspect.getfullargspec(method)
+		args = argspec[0]
+		return args and args[0] == 'self'
+	return False
 
 
+@export
 class ViewType(type):
 
 	def __new__(mcls, name, bases, dct):
 		dct.setdefault('endpoint', None)
 		cls = super(ViewType, mcls).__new__(mcls, name, bases, dct)
+
 		if 'methods' not in dct:
 			methods = set(cls.methods or [])
 			for key in dct:
@@ -67,12 +79,68 @@ class ViewType(type):
 
 		cls.decorators = decorators
 		cls.declared_methods = set(declared_http_methods(cls))
+
+		# cls._meta = cls._create_options()
+		# cls._meta._prepare()
+
 		return cls
+
+	def _create_options(cls):
+		opts_cls = cls._get_options_cls()
+		meta = getattr(cls, 'Meta', None)
+		base = getattr(cls, '_meta', None)
+		return opts_cls(cls, meta, base)
+
+	def _get_options_cls(cls):
+		bases = []
+		for c in cls.mro():
+			oc = getattr(cls, 'OPTIONS_CLASS', None)
+			if oc and not list(filter(lambda x: issubclass(x, oc), bases)):
+				bases.append(oc)
+		return type('%sOptions' % cls.__name__, tuple(bases), {})
+
+
+
+@export
+class ViewOptions(BaseViewOptions):
+
+	declared_methods = viewoption(lambda o,*a: set(declared_http_methods(o.view)))
+
+	@viewoption(default=Void)
+	def methods(self, value, base_value=None):
+		"""List of declared Http methods.
+		"""
+		if value is Void:
+			value = set(base_value or [])
+			for key, val in self.view.__dict__.items():
+				if key in http_method_funcs and is_instance_method(val):
+					value.add(key.upper())
+		# If we have no method at all in there we don't want to
+		# add a method list.  (This is for instance the case for
+		# the base class or another subclass of a base method view
+		# that does not introduce new methods).
+		return value and list(sorted(value)) or None
+
+	@viewoption
+	def decorators(self, value, bv=None):
+		value = list(reversed(value or ()))
+		for c in self.view.mro():
+			if c is self.view or not isinstance(c, ViewType):
+				continue
+			for d in c._meta.decorators:
+				if d not in value:
+					value.append(d)
+		print('decorators:', self.view.__name__, value)
+
+		return value
 
 
 
 class View(FlaskView, metaclass=ViewType):
 	#: A list of methods this view can handle.
+
+	OPTIONS_CLASS = ViewOptions
+
 	methods = None
 
 	decorators = ()
@@ -111,7 +179,7 @@ class View(FlaskView, metaclass=ViewType):
 				response = self(*args, **kwargs)
 				return response
 
-			name = cls.endpoint or cls.__name__
+			name = cls.endpoint or uzi.snake(cls.__name__)
 			if cls.decorators:
 				view.__name__ = name
 				view.__module__ = cls.__module__

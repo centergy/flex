@@ -25,8 +25,7 @@ class class_only_method(classmethod):
 class class_property(classmethod):
 	"""A decorator that converts a function into a lazy class property."""
 	def __get__(self, obj, cls):
-		func = super(class_property, self).__get__(obj, cls)
-		return func()
+		return super(class_property, self).__get__(obj, cls)()
 
 
 class cached_class_property(class_property):
@@ -38,11 +37,17 @@ class cached_class_property(class_property):
 		self.__doc__ = doc or func.__doc__
 		self.lock = RLock()
 
+	def resolve(self, obj, cls):
+		return super(cached_class_property, self).__get__(obj, cls)
+
 	def __get__(self, obj, cls):
 		with self.lock:
-			rv = super(cached_class_property, self).__get__(obj, cls)
-			setattr(cls, self.__name__, rv)
-			return rv
+			if self.__name__ not in cls.__dict__:
+				rv = self.resolve(obj, cls)
+				setattr(cls, self.__name__, rv)
+				return rv
+			else:
+				return getattr(cls, self.__name__)
 
 
 class cached_property(property):

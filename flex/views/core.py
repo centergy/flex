@@ -80,8 +80,8 @@ class ViewType(type):
 		cls.decorators = decorators
 		cls.declared_methods = set(declared_http_methods(cls))
 
-		# cls._meta = cls._create_options()
-		# cls._meta._prepare()
+		cls._meta = cls._create_options()
+		cls._meta._prepare()
 
 		return cls
 

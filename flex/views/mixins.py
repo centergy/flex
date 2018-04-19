@@ -4,10 +4,13 @@ class CreateModelMixin(object):
 
 	create_success_status = 201
 
+	# def get_create_success_data(self, obj):
+	# 	if self.lookup_field and hasattr(obj, self.lookup_field):
+	# 		key = self.lookup_kwarg or self.lookup_field
+	# 		return { key : str(getattr(obj, self.lookup_field)) }
+
 	def get_create_success_data(self, obj):
-		if self.lookup_field and hasattr(obj, self.lookup_field):
-			key = self.lookup_kwarg or self.lookup_field
-			return { key : str(getattr(obj, self.lookup_field)) }
+		return self.schema.dump(obj).data if obj is not None else None
 
 	def on_create_success(self, obj):
 		if obj is not None:
@@ -23,7 +26,8 @@ class CreateModelMixin(object):
 		return obj
 
 	def create(self, *args, **kwargs):
-		data = self.get_serializer(strict=True).load(self.request.input).data
+		# data = self.get_serializer(strict=True).load(self.request.input).data
+		data = self.schema.load(self.request.input).data
 		obj = self.perform_create(data)
 		self.on_create_success(obj)
 
@@ -38,7 +42,8 @@ class ListModelMixin(object):
 	def list(self, *args, **kwargs):
 		data = self.get_list()
 		if data is not None:
-			self.payload.data = self.get_serializer().dump(data, many=True).data
+			# self.payload.data = self.get_serializer().dump(data, many=True).data
+			self.payload.data = self.schema.dump(data, many=True).data
 
 
 class RetrieveModelMixin(object):
@@ -47,7 +52,8 @@ class RetrieveModelMixin(object):
 	def retrieve(self, *args, **kwargs):
 		obj = self.get_object()
 		if obj is not None:
-			self.payload.data = self.get_serializer().dump(obj).data
+			# self.payload.data = self.get_serializer().dump(obj).data
+			self.payload.data = self.schema.dump(obj).data
 
 
 class UpdateModelMixin(object):
@@ -61,16 +67,16 @@ class UpdateModelMixin(object):
 				self.payload.data = data
 
 	def get_update_success_data(self, obj):
-		return self.get_serializer().dump(obj) if obj is not None else None
+		# return self.get_serializer().dump(obj) if obj is not None else None
+		return self.schema.dump(obj).data if obj is not None else None
 
 	def update(self, *args, **kw):
 		instance = self.get_object()
 		if instance is None:
 			return self.abort(404)
 
-		data = self.get_serializer(strict=True)\
-				.load(self.request.input, partial=kw.pop('partial', False))\
-				.data
+		# data = self.get_serializer(strict=True)\
+		data = self.schema.load(self.request.input, partial=kw.get('partial')).data
 		instance = self.perform_update(instance, data)
 		self.on_update_success(instance)
 

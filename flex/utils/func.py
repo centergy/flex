@@ -5,7 +5,6 @@ from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlparse, url
 __all__ = ['asset_url', 'url_is', 'is_safe_url', 'redirect']
 
 
-
 def issafeurl(target):
 	real = urlparse(request.host_url)
 	url = urlparse(urljoin(request.host_url, target))

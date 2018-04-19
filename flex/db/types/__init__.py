@@ -60,7 +60,7 @@ from sqlalchemy.types import (
 
 
 from sqlalchemy_utils.types import (
-	ArrowType,
+	ArrowType as BaseArrowType,
 	ChoiceType,
 	ColorType,
 	CompositeArray,
@@ -148,7 +148,7 @@ class URL(URLType):
 
 
 
-class Carbon(types.ArrowType):
+class Carbon(BaseArrowType):
 
 	carbon_factory = carbon.carbon
 
@@ -165,6 +165,11 @@ class Carbon(types.ArrowType):
 			value = value.to('UTC')
 		return value.datetime if self.impl.timezone else value.naive
 
+	def process_result_value(self, value, dialect):
+		if value:
+			return self.carbon_factory.get(value)
+		return value
+
 	def _coerce(self, value):
 		if value is None or isinstance(value, self.carbon_factory.type):
 			return value
@@ -179,6 +184,36 @@ class Carbon(types.ArrowType):
 		elif isinstance(value, arrow.Arrow):
 			value = self.carbon_factory.get(value)
 		return value
+
+ArrowType = Carbon
+
+
+# class Timespan(TypeDecorator):
+
+# 	impl = Unicode(40)
+# 	timespan_class = carbon.timespan
+# 	python_type = carbon.timespan
+
+# 	def process_bind_param(self, value, dialect):
+# 		return None if value is None else str(self._coerce(value))
+
+# 	def process_result_value(self, value, dialect):
+# 		return value and self.timespan_class.parse(value) or None
+
+# 	def process_literal_param(self, value, dialect):
+# 		return None if value is None else str(self._coerce(value))
+
+# 	def _coerce(self, value):
+# 		if value is None:
+# 			return None
+# 		elif isinstance(value, self.timespan_class):
+# 			return value
+# 		else:
+# 			return self.timespan_class.parse(value)
+
+# 	@property
+# 	def python_type(self):
+# 		return self.impl.type.python_type
 
 
 

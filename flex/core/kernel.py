@@ -7,15 +7,18 @@ from flask.helpers import find_package
 from flask.app import setupmethod
 from functools import update_wrapper
 
+from flex.utils import json
+from flex.http import Request, Response
+from flex.datastructures import AttrDict
+from flex.conf import Config, config as global_config
+from flex.utils.decorators import locked_cached_property
+from flex.utils.module_loading import import_string, import_strings
+
 from . import signals
-from ..http import Request, Response
-from ..conf import Config, config as global_config
 from .cli import Manager, Shell, Server
-from ..utils.module_loading import import_string, import_strings
 from .sessions import SecureCookieSessionInterface
-from ..utils.decorators import locked_cached_property
 from .exc import ImproperlyConfigured
-from ..utils import json
+
 
 
 def postboot_method(f):
@@ -82,13 +85,14 @@ class Kernel(Flask):
 		)
 
 		super(Kernel, self).__init__(import_name, **kwargs)
+		self.extensions = AttrDict()
 		self._has_booted = False
 
 	@locked_cached_property
 	def console(self):
 		if self.is_cli:
 			rv = Manager(self, with_default_commands=False)
-			rv.add_command("start", Server())
+			rv.add_command("start", Server(host=self.config.HOST, port=self.config.PORT))
 			rv.add_command("shell", Shell())
 			return rv
 

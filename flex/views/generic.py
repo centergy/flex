@@ -1,9 +1,10 @@
 import re
 from flask.views import View
 
-from flex.utils.decorators import export
+from flex.utils.decorators import export, cached_class_property
 
 from .core import View
+from .options import ViewOptions, viewoption
 from flask import current_app
 from .config import config
 from . import mixins
@@ -16,7 +17,16 @@ NOTHING = object()
 
 
 @export
+class GenericViewOptions(ViewOptions):
+
+	schema = viewoption(lambda o,*a: o.view.serializer_class and o.view.serializer_class(strict=True))
+
+
+
+@export
 class GenericView(View):
+
+	OPTIONS_CLASS = GenericViewOptions
 
 	lookup_field = 'pk'
 	lookup_kwarg = None
@@ -35,6 +45,10 @@ class GenericView(View):
 	@property
 	def model_class(self):
 		return self.manager.model_class
+
+	@property
+	def schema(self):
+		return self._meta.schema
 
 	def get_model_class(self, query=None):
 		assert self.model_class is not None, (

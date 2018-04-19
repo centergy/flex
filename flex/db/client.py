@@ -340,6 +340,7 @@ class Client(SQLClient):
 
 	def create_scoped_session(self, **options):
 		scopefunc = options.pop('scopefunc', _app_ctx_stack.__ident_func__)
+		# scopefunc = options.pop('scopefunc', None)
 		factory = self.create_session(**options)
 		return orm.scoped_session(factory, scopefunc=scopefunc)
 

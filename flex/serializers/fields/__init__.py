@@ -11,6 +11,8 @@ from flex.conf import config
 from flex import carbon
 
 import phonenumbers
+from flex import intervals
+
 
 
 class Slug(String):
@@ -75,7 +77,6 @@ class Enum(Field):
 	blank_to_none = True
 
 	default_error_messages = {
-		'required': 'This field is required.',
 		'invalid': 'Not a valid option.',
 	}
 
@@ -96,12 +97,44 @@ class Enum(Field):
 			self.fail('invalid')
 
 
+class Range(Field):
+
+	blank_to_none = True
+	range_class = intervals.Interval
+
+	default_error_messages = {
+		'invalid': 'Not a valid range.',
+	}
+
+	def __init__(self, type=None, as_string=True, **kwargs):
+		super(Range, self).__init__(as_string=as_string, **kwargs)
+		if type is not None:
+			self.range_class = type
+
+	def _serialize(self, value, attr, obj):
+		if value is None:
+			return value
+		else:
+			return str(value)
+
+	def _deserialize(self, value, attr, data):
+		try:
+			if isinstance(value, str):
+				return self.range_class.from_string(value)
+			elif isinstance(value, (list, tuple)) and len(value) == 2:
+				return self.range_class(value)
+			else:
+				self.fail('invalid')
+		except (intervals.IntervalException, TypeError):
+			self.fail('invalid')
+
+
 class PhoneNumber(String):
 
 	default_error_messages = {
 		# 'required': 'This field is required.',
-		'type': 'Invalid input type.', # used by Unmarshaller
-		'null': 'This field is required.',
+		# 'type': 'Invalid input type.', # used by Unmarshaller
+		# 'null': 'This field is required.',
 		'invalid': "This field must be a valid phone number ('+XXXXXXXXXX', or'0XXXXXXXXX' if local). 15 digits max.",
 	}
 	default_region = 'KE'
@@ -132,7 +165,7 @@ class PhoneNumber(String):
 
 class Money(Decimal):
 
-	def __init__(self, places=2, rounding=None, thousand_sep=True, **kwargs):
+	def __init__(self, places=2, rounding=None, thousand_sep=False, **kwargs):
 		super(Money, self).__init__(places, rounding, **kwargs)
 		self.thousand_sep = thousand_sep
 

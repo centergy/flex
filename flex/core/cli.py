@@ -67,8 +67,8 @@ class Command(BaseCommand):
 
 
 class Server(BaseServer):
-
-	def __init__(self, host=None, port=None, **options):
-		super(Server, self).__init__(host=host, port=port, **options)
+	pass
+	# def __init__(self, host=None, port=None, **options):
+	# 	super(Server, self).__init__(host=host, port=port, **options)
 
 

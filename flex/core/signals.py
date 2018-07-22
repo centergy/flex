@@ -31,4 +31,7 @@ session_started = signal('session_started')
 session_ending = signal('session_ending')
 session_ended = signal('session_ended')
 
+install = signal('install')
+
+
 

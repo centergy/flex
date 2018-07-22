@@ -95,7 +95,7 @@ from sqlalchemy_utils.types import (
 __all__ = []
 
 from sqlalchemy.dialects import postgresql as pg
-
+from sqlalchemy.util import generic_repr
 
 import six
 import arrow
@@ -107,48 +107,54 @@ from flex.conf import config
 from flex.locale import locale
 
 
-class Choice(ChoiceType):
+class _GenericReprMixin(object):
+
+	def __repr__(self):
+		return generic_repr(self)
+
+
+
+class Choice(_GenericReprMixin, ChoiceType):
+	pass
+
+class Color(_GenericReprMixin, ColorType):
 	pass
 
 
-class Color(ColorType):
+class Country(_GenericReprMixin, CountryType):
 	pass
 
 
-class Country(CountryType):
+class Currency(_GenericReprMixin, CurrencyType):
 	pass
 
 
-class Currency(CurrencyType):
+class Composite(_GenericReprMixin, CompositeType):
 	pass
 
 
-class Composite(CompositeType):
+class DateRange(_GenericReprMixin, DateRangeType):
 	pass
 
 
-class DateRange(DateRangeType):
+class DateTimeRange(_GenericReprMixin, DateTimeRangeType):
 	pass
 
 
-class DateTimeRange(DateTimeRangeType):
+class Encrypted(_GenericReprMixin, EncryptedType):
 	pass
 
 
-class Encrypted(EncryptedType):
+class Email(_GenericReprMixin, EmailType):
 	pass
 
 
-class Email(EmailType):
-	pass
-
-
-class URL(URLType):
+class URL(_GenericReprMixin, URLType):
 	pass
 
 
 
-class Carbon(BaseArrowType):
+class Carbon(_GenericReprMixin, BaseArrowType):
 
 	carbon_factory = carbon.carbon
 
@@ -217,7 +223,7 @@ ArrowType = Carbon
 
 
 
-class Password(BasePasswordType):
+class Password(_GenericReprMixin, BasePasswordType):
 	"""docstring for PasswordType"""
 	def __init__(self, max_length=None, onload=None, **kwargs):
 		length = kwargs.pop('length', None)
@@ -234,7 +240,7 @@ PasswordMutable.associate_with(Password)
 
 
 
-class PhoneNumber(BasePhoneNumberType):
+class PhoneNumber(_GenericReprMixin, BasePhoneNumberType):
 	default_region = 'KE'
 
 	def __init__(self, region=None, max_length=20, *args, **kwargs):

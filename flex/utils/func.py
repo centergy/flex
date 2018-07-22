@@ -1,11 +1,12 @@
 import os
+import flask as fl
 from flask import current_app, url_for, request
 from urllib.parse import quote, quote_plus, unquote, unquote_plus, urlparse, urljoin
 
 __all__ = ['asset_url', 'url_is', 'is_safe_url', 'redirect']
 
 
-def issafeurl(target):
+def is_safe_url(target):
 	real = urlparse(request.host_url)
 	url = urlparse(urljoin(request.host_url, target))
 	return url.scheme in ('http', 'https') and \
@@ -14,7 +15,7 @@ def issafeurl(target):
 def redirect(location, code=302, safe=False, Response=None):
 	if safe and not is_safe_url(location):
 		raise exc.UnSafeUrlError("Error redirecting to `{0}`.")
-	return flask.redirect(location, code=code, Response=Response)
+	return fl.redirect(location, code=code, Response=Response)
 
 
 def asset_url(path, blueprint=None):

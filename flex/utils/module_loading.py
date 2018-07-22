@@ -29,7 +29,7 @@ def import_string(import_name, package=None, *, silent=False):
 		if not item:
 			return module
 	except ImportError as e:
-		if silent and e.name.endswith(path.lstrip('.')):
+		if silent and hasattr(e, 'name') and e.name and e.name.endswith(path.lstrip('.')):
 			return
 		raise e
 

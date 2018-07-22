@@ -38,6 +38,9 @@ class EnumMeta(BaseEnumMeta):
 			except KeyError:
 				raise e
 
+	def __repr__(self):
+		return '%s' % (self.__name__)
+
 
 @export
 class Enum(EnumMeta('Enum', (BaseEnum,), _EnumDict())):

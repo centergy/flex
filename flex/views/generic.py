@@ -121,7 +121,7 @@ class GenericView(View):
 		model_class = self.get_model_class()
 
 		lookup_field = getattr(model_class, self.lookup_field)
-		rv = query.filter(lookup_field == self.kwargs[lookup_kwarg]).one()
+		rv = query.filter(lookup_field == self.kwargs[lookup_kwarg]).one_or_none()
 		if rv is None:
 			return self.abort(404, self.kwargs[lookup_kwarg])
 		return rv

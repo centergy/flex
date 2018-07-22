@@ -4,7 +4,7 @@ from .core import lazy, lazy_import
 
 
 
-DEBUG = get_debug_flag(default=False)
+DEBUG = get_debug_flag()
 
 HOST = '127.0.0.1'
 

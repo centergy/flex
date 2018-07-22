@@ -87,14 +87,17 @@ class Enum(Field):
 	def _serialize(self, value, attr, obj):
 		if value is None:
 			return value
-		rv = getattr(value, 'label', None)
-		return getattr(value, 'name') if rv is None else rv
+		else:
+			return value.value
+		# rv = getattr(value, 'label', None)
+		# return getattr(value, 'name') if rv is None else rv
 
 	def _deserialize(self, value, attr, data):
 		try:
-			return self.enumcls[value]
+			return self.enumcls(value)
 		except KeyError:
 			self.fail('invalid')
+
 
 
 class Range(Field):
@@ -135,7 +138,7 @@ class PhoneNumber(String):
 		# 'required': 'This field is required.',
 		# 'type': 'Invalid input type.', # used by Unmarshaller
 		# 'null': 'This field is required.',
-		'invalid': "This field must be a valid phone number ('+XXXXXXXXXX', or'0XXXXXXXXX' if local). 15 digits max.",
+		'invalid': "Enter a valid phone number. +XXXXXXXXX or 0XXXXXXXX 15 digits max.",
 	}
 	default_region = 'KE'
 	blank_to_none = True

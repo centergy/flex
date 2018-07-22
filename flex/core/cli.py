@@ -5,6 +5,8 @@ from flask_script import(
 )
 from datetime import datetime
 from flex.carbon import carbon
+from . import signals
+from flask import current_app
 
 
 __all__ = (
@@ -72,3 +74,10 @@ class Server(BaseServer):
 	# 	super(Server, self).__init__(host=host, port=port, **options)
 
 
+def install_command(addons=''):
+	for addon in (x.strip() for x in addons.split(',') if x.strip()):
+		print('Installing:', addon)
+		obj = current_app._load_addon(addon)
+		signals.install.send(addon, addon=obj, app=current_app._get_current_object())
+		signals.install.send(obj, app=current_app._get_current_object())
+		print('')

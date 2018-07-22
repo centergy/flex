@@ -191,24 +191,29 @@ class BaseCache(object):
 		"""
 		return self.get(key, version=version) is not None
 
-	def incr(self, key, delta=1, version=None):
+	def incr(self, key, delta=1, default=None, timeout=DEFAULT_TIMEOUT, version=None):
 		"""
 		Add delta to value in the cache. If the key does not exist, raise a
 		ValueError exception.
 		"""
 		value = self.get(key, version=version)
 		if value is None:
-			raise ValueError("Key '%s' not found" % key)
+			if default is not None:
+				self.set(key, default, timeout=timeout, version=version)
+				return default
+			else:
+				raise ValueError("Key '%s' not found" % key)
+
 		new_value = value + delta
 		self.set(key, new_value, version=version)
 		return new_value
 
-	def decr(self, key, delta=1, version=None):
+	def decr(self, key, delta=1, default=None, timeout=DEFAULT_TIMEOUT, version=None):
 		"""
 		Subtract delta from value in the cache. If the key does not exist, raise
 		a ValueError exception.
 		"""
-		return self.incr(key, -delta, version=version)
+		return self.incr(key, -delta, default=default, timeout=timeout, version=version)
 
 	def __contains__(self, key):
 		"""
@@ -218,6 +223,11 @@ class BaseCache(object):
 		# so that it always has the same functionality as has_key(), even
 		# if a subclass overrides it.
 		return self.has_key(key)
+
+	def lock(self, key, version=None, timeout=None, blocking_timeout=None):
+		"""Return a new Lock object for key that mimics the behavior of threading.Lock.
+		"""
+		raise NotImplementedError('subclasses of BaseCache must provide a lock() method')
 
 	def set_many(self, data, timeout=DEFAULT_TIMEOUT, version=None):
 		"""

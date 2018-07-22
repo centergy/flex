@@ -1,3 +1,4 @@
+from ..http import status
 
 class CreateModelMixin(object):
 	"""Create a model instance."""
@@ -71,9 +72,7 @@ class UpdateModelMixin(object):
 		return self.schema.dump(obj).data if obj is not None else None
 
 	def update(self, *args, **kw):
-		instance = self.get_object()
-		if instance is None:
-			return self.abort(404)
+		instance = self.get_object() or self.abort(404)
 
 		# data = self.get_serializer(strict=True)\
 		data = self.schema.load(self.request.input, partial=kw.get('partial')).data
@@ -100,10 +99,14 @@ class DestroyModelMixin(object):
 	"""
 	Destroy a model instance.
 	"""
-	def destroy(self, request, *args, **kwargs):
-		instance = self.get_object()
+
+	delete_success_status = status.HTTP_204_NO_CONTENT
+
+	def destroy(self, *args, **kwargs):
+		instance = self.get_object() or self.abort(404)
 		self.perform_destroy(instance)
-		return Response(status=status.HTTP_204_NO_CONTENT)
+		self.payload.status = self.delete_success_status
 
 	def perform_destroy(self, instance):
 		instance.delete()
+		self.manager.db.commit()

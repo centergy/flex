@@ -3,7 +3,7 @@ from ..db import (
 	Query, defer_column_creation
 )
 from sqlalchemy_mptt.mixins import BaseNestedSets
-from sqlalchemy import UniqueConstraint, desc, asc, event
+from sqlalchemy import Index, UniqueConstraint, desc, asc, event
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy_utils import generic_relationship
@@ -11,47 +11,11 @@ from sqlalchemy_utils import generic_relationship
 
 import datetime
 
+class _BaseNestedSet(object):
 
-@defer_column_creation
-class NestedSet(BaseNestedSets):
-
-	@declared_attr
-	def tree_id(cls):
-		return Column("tree_id", types.Integer)
-
-	@declared_attr
-	def parent_id(cls):
-		pk = cls.get_pk_column()
-		if not pk.name:
-			pk.name = cls.get_pk_name()
-
-		return Column("parent_id", pk.type,
-					  FK('%s.%s' % (cls.__tablename__, pk.name),
-								 ondelete='CASCADE'))
-
-	@declared_attr
-	def parent(self):
-		return orm.relation(
-			self,
-			order_by=lambda: self.left,
-			foreign_keys=[self.parent_id],
-			remote_side='{}.{}'.format(self.__name__, self.get_pk_name()),
-			backref=orm.backref('children', cascade="all,delete",
-							# lazy="dynamic",
-							order_by=lambda: (self.tree_id, self.left)),
-		)
-
-	@declared_attr
-	def left(cls):
-		return Column("lft", types.Integer, nullable=False)
-
-	@declared_attr
-	def right(cls):
-		return Column("rgt", types.Integer, nullable=False)
-
-	@declared_attr
-	def level(cls):
-		return Column("level", types.Integer, nullable=False, default=0)
+	@hybrid_property
+	def is_root_node(self):
+		return self.parent_id == None
 
 	def path_to_root(self, reverse=False, inclusive=True, session=None):
 		"""Generate path from a leaf or intermediate node to the root."""
@@ -102,6 +66,57 @@ class NestedSet(BaseNestedSets):
 				recursive(node.children.all(), left, right, level)
 
 		recursive(top.children.all(), left, right, level)
+
+
+
+
+@defer_column_creation
+class NestedSet(_BaseNestedSet, BaseNestedSets):
+	sqlalchemy_mptt_default_level = 0
+
+	@declared_attr
+	def __table_args__(cls):
+		return (
+			Index(None, cls.left),
+			Index(None, cls.right),
+			Index(None, cls.level),
+		)
+
+	@declared_attr
+	def tree_id(cls):
+		return Column("tree_id", types.Integer)
+
+	@declared_attr
+	def parent_id(cls):
+		pk = cls.get_pk_column()
+		if not pk.name:
+			pk.name = cls.get_pk_name()
+
+		return Column("parent_id", FK('%s.%s' % (cls.__tablename__, pk.name), ondelete='CASCADE'))
+
+	@declared_attr
+	def parent(self):
+		return orm.relation(
+			self,
+			order_by=lambda: self.left,
+			foreign_keys=lambda: [self.parent_id],
+			remote_side='{}.{}'.format(self.__name__, self.get_pk_name()),
+			backref=orm.backref('children', cascade="all,delete",
+							# lazy="dynamic",
+							order_by=lambda: (self.tree_id, self.left)),
+		)
+
+	@declared_attr
+	def left(cls):
+		return Column("lft", types.Integer, nullable=False)
+
+	@declared_attr
+	def right(cls):
+		return Column("rgt", types.Integer, nullable=False)
+
+	@declared_attr
+	def level(cls):
+		return Column("level", types.Integer, nullable=False, default=0)
 
 
 

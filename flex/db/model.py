@@ -179,7 +179,6 @@ class Options(object):
 
 		del self.meta
 		setattr(cls, name, self)
-
 		self._set_model_timestamp_columns()
 
 	def _prepare(self):
@@ -189,7 +188,7 @@ class Options(object):
 		self.ordering_inverse
 
 	def _set_model_timestamp_columns(self):
-		if self._timestamps:
+		if self.model_class.__name__ != 'BaseModel' and self._timestamps:
 			cols = self._timestamps
 			if cols is True:
 				cols = ('created_at', 'modified_at')
@@ -267,6 +266,7 @@ class ModelMeta(BaseModelMeta):
 	def __new__(mcls, name, bases, dct):
 		dct['_declared_class_attrs'] = list(dct.keys())
 		meta = dct.get('Meta')
+
 		if meta:
 			if hasattr(meta, 'table_args'):
 				dct['__table_args__'] = meta.table_args
@@ -274,6 +274,7 @@ class ModelMeta(BaseModelMeta):
 				dct['__mapper_args__'] = meta.mapper_args
 
 		cls = super(ModelMeta, mcls).__new__(mcls, name, bases, dct)
+
 		if not meta:
 			meta = getattr(cls, 'Meta', None)
 		cls._add_to_class('_opts', Options(meta))
@@ -315,6 +316,7 @@ class ModelMeta(BaseModelMeta):
 	def _fix_inherited_attrs_creation_order(cls, mixin):
 		for name, value in get_orderable_members(mixin):
 			set_late_creation_order(getattr(cls, name))
+
 
 
 class BaseModel(ModelBase):
@@ -381,11 +383,23 @@ class BaseModel(ModelBase):
 		elif flush and not session.autoflush:
 			session.flush()
 
-	def __str__(self):
-		return '{%s}' % ', '.join(('%s=%r' % (c,v)) for c,v in self.columns())
+	# def __eq__(self, other):
+	# 	if not isinstance(other, self.__class__):
+	# 		return False
+	# 	else:
+	# 		my_pk = self.pk
+	# 		return self is other if my_pk is None else my_pk == other.pk
 
-	def __repr__(self):
-		return '%s(%s)' % (self.__class__.__name__, self)
+	# def __hash__(self):
+	# 	if self.pk is None:
+	# 		raise TypeError("Model instances without primary key value are unhashable")
+	# 	return hash(self.pk)
+
+	# def __str__(self):
+	# 	return '{%s}' % ', '.join(('%s=%r' % (c,v)) for c,v in self.__class__.columns())
+
+	# def __repr__(self):
+	# 	return '%s(%s)' % (self.__class__.__name__, self)
 
 
 	# def validate(self):

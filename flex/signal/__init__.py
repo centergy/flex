@@ -3,6 +3,8 @@ from weakref import WeakValueDictionary
 from blinker import receiver_connected, ANY
 from flex.datastructures.collections import AttrDict, MutableAttrMap
 from flex.utils.decorators import export, locked_cached_property
+from collections import Iterable
+
 
 __all__ = [
 	'receiver_connected', 'ANY', 'signals'
@@ -74,11 +76,10 @@ class Signal(bl.Signal):
 		:param \*\*kwargs: Data to be sent to receivers.
 
 		"""
-		if value is not NOTHING:
-			kwargs['value'] = value
+		kw = dict(value=value, **kwargs) if value is not NOTHING else kwargs
 
 		for receiver in (self.receivers and self.receivers_for(sender) or ()):
-			yield receiver, receiver(sender, **kwargs)
+			yield receiver, receiver(sender, **kw)
 
 	def pipe(self, sender=None, value=None, **kwargs):
 		"""Emit this signal on behalf of *sender* as a pipeline, passing on the
@@ -101,6 +102,7 @@ class Signal(bl.Signal):
 		return value
 
 
+
 @export
 class NamedSignal(Signal):
 	"""A named generic notification emitter."""
@@ -113,6 +115,7 @@ class NamedSignal(Signal):
 	def __repr__(self):
 		base = super(NamedSignal, self).__repr__()
 		return "%s; %r>" % (base[:-1], self.name)
+
 
 
 @export
@@ -179,6 +182,7 @@ def signal(name, doc=None):
 	return signals.signal(name, doc)
 
 
+
 def pipeline(name, doc=None):
 	"""Return the :class:`NamedSignal` *name*, creating it if required.
 
@@ -188,4 +192,31 @@ def pipeline(name, doc=None):
 
 
 
+@export
+def receiver(signal, sender=ANY, weak=True):
+	"""A decorator for connecting receivers to signals. Used by passing in the
+	signal (or list of signals) name(s) or instance(s) and a sender
+	(or list of senders).
+	"""
+	if not isinstance(signal, (list, tuple)):
+		signal = (signal,)
+
+	if not isinstance(sender, (list, tuple)):
+		sender = (sender,)
+
+	def decorator(fn):
+		for sig in signal:
+			if isinstance(sig, str):
+				sig = signals.signal(sig)
+			for sen in sender:
+				sig.connect(fn, sen, weak)
+		return fn
+	return decorator
+
+
+
 signals = Namespace()
+
+
+
+

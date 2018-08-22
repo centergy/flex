@@ -1,7 +1,7 @@
-from threading import RLock
-from warnings import warn
-
 import sys
+from threading import RLock
+from functools import update_wrapper, wraps
+from warnings import warn
 
 NOTHING = object()
 
@@ -22,19 +22,24 @@ class class_only_method(classmethod):
 		return super(class_only_method, self).__get__(obj, cls)
 
 
-class class_property(classmethod):
+class class_property(object):
 	"""A decorator that converts a function into a lazy class property."""
+
+	def __init__(self, func, name=None, doc=None):
+		self.__name__ = name or func.__name__
+		self.__module__ = func.__module__
+		self.__doc__ = doc or func.__doc__
+		self.func = func
+
 	def __get__(self, obj, cls):
-		return super(class_property, self).__get__(obj, cls)()
+		return self.func(cls)
 
 
 class cached_class_property(class_property):
 	"""A decorator that converts a function into a lazy class property."""
+
 	def __init__(self, func, name=None, doc=None):
-		super(cached_class_property, self).__init__(func)
-		self.__name__ = name or func.__name__
-		self.__module__ = func.__module__
-		self.__doc__ = doc or func.__doc__
+		super(cached_class_property, self).__init__(func, name, doc)
 		self.lock = RLock()
 
 	def resolve(self, obj, cls):
@@ -50,7 +55,7 @@ class cached_class_property(class_property):
 				return getattr(cls, self.__name__)
 
 
-class cached_property(property):
+class cached_property(object):
 	"""A decorator that converts a function into a lazy property.  The
 	function wrapped is called the first time to retrieve the result
 	and then that calculated result is used the next time you access
@@ -62,59 +67,72 @@ class cached_property(property):
 			def foo(self):
 				# calculate something important here
 				return 42
-
-	The class has to have a `__dict__` in order for this property to
-	work.
 	"""
 
-	# implementation detail: A subclass of python's builtin property
-	# decorator, we override __get__ to check for a cached value. If one
-	# choses to invoke __get__ by hand the property will still work as
-	# expected because the lookup logic is replicated in __get__ for
-	# manual invocation.
+	__slots__ = ('__name__', '____doc__', 'fget', 'fset', 'fdel', 'lock')
 
-	def __init__(self, func, lock=False, name=None, doc=None):
-		self.__name__ = name or func.__name__
-		self.__module__ = func.__module__
-		self.__doc__ = doc or func.__doc__
-		self.func = func
+	def __init__(self, fget, fset=None, fdel=None, lock=False, name=None, doc=None):
+		self.__name__ = name or fget.__name__
+		self.____doc__ = doc or fget.__doc__
+		self.fget = fget
+		self.fset = fset
+		self.fdel = fdel
 		self.lock = (lock or None) and RLock()
 
-	def __set__(self, obj, value):
-		if self.lock is None:
-			return self._set_value(obj, value)
-		else:
-			with self.lock:
-				return self._set_value(obj, value)
+	def getter(self, fn):
+		self.fget = fn
+
+	def setter(self, fn):
+		self.fset = fn
+
+	def deleter(self, fn):
+		self.fdel = fn
 
 	def __get__(self, obj, owner):
 		if obj is None:
 			return self
 		if self.lock is None:
-			return self._resolve(obj, owner)
+			return self._resolve(obj)
 		else:
 			with self.lock:
-				return self._resolve(obj, owner)
+				return self._resolve(obj)
+
+	def __set__(self, obj, value):
+		fn = self.fset or self._set_value
+		if self.lock is None:
+			return fn(obj, value)
+		else:
+			with self.lock:
+				return fn(obj, value)
+
+	def __delete__(self, obj):
+		fn = self.fdel or self._del_value
+		if self.lock is None:
+			return fn(obj)
+		else:
+			with self.lock:
+				return fn(obj)
 
 	def _set_value(self, obj, value):
-		if _attr_is_sloted(obj.__class__, self.__name__):
-			setattr(obj, self.__name__, value)
-		else:
-			obj.__dict__[self.__name__] = value
+		obj.__dict__[self.__name__] = value
 
-	def _resolve(self, obj, owner=None):
-		if _attr_is_sloted(obj.__class__, self.__name__):
-			# value = getattr(obj, self.__name__, NOTHING)
-			# if value is NOTHING:
-			# Commented this out as it might cause infinite recursion
-			# TODO: Find out whether this causes any recursion.
-			value = self.func(obj)
-			setattr(obj, self.__name__, value)
+	def _get_value(self, obj):
+		return obj.__dict__[self.__name__]
+
+	def _del_value(self, obj):
+		if self.fdel:
+			self.fdel(obj)
 		else:
-			value = obj.__dict__.get(self.__name__, NOTHING)
-			if value is NOTHING:
-				value = obj.__dict__[self.__name__] = self.func(obj)
-		return value
+			obj.__dict__.pop(self.__name__, None)
+
+	def _resolve(self, obj):
+		try:
+			return self._get_value(obj)
+		except (KeyError, AttributeError):
+			value = self.fget(obj)
+			self._set_value(obj, value)
+			return value
+
 
 
 class locked_cached_property(cached_property):
@@ -125,8 +143,8 @@ class locked_cached_property(cached_property):
 	thread safety.
 	"""
 
-	def __init__(self, func, name=None, doc=None):
-		super(locked_cached_property, self).__init__(func, lock=True, name=name, doc=doc)
+	def __init__(self, fget, name=None, doc=None):
+		super(locked_cached_property, self).__init__(fget, lock=True, name=name, doc=doc)
 
 
 
@@ -292,3 +310,39 @@ def _attr_is_sloted(cls, attr):
 			return True
 
 	return False
+
+
+
+def deprecated(*fn, alt=None, version=None, message=None, once=False, onload=False):
+	"""Issues a deprecated warning on module load or when the decorated function is invoked.
+	"""
+	def decorate(func, alt=alt, version=version, message=message, once=once, onload=onload):
+		if message is None:
+			data = dict(
+				name='%s.%s()' % (func.__module__, func.__name__),
+				alt=None if alt is None else alt if isinstance(alt, str) else '%s.%s()' % (alt.__module__, alt.__name__),
+			)
+
+			message = ''.join([
+				'{name} is deprecated',
+				' in favor of {alt}.' if data['alt'] else '.',
+			])
+			message.format(**data)
+
+		if onload:
+			warn(message, DeprecationWarning, 2)
+			return func
+		else:
+			@wraps(func)
+			def wrapper(*a, **kw):
+				if not once or not func.__deprecation_warned__:
+					warn(message, DeprecationWarning, 2)
+					func.__deprecation_warned__ = once
+				return func(*a, **kw)
+
+			func.__deprecation_warned__ = False
+			return wrapper
+
+	decorate.alt, decorate.message, decorate.version, decorate.once, decorate.onload = alt, message, version, once, onload
+
+	return decorate(fn[0]) if fn else decorate

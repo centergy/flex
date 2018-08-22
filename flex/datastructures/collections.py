@@ -8,6 +8,9 @@ __all__ = []
 
 NOTHING = object()
 
+
+
+
 @export
 class AttrMap(Mapping):
 
@@ -53,6 +56,7 @@ class MutableAttrMap(MutableMapping, AttrMap):
 				raise e
 
 
+
 @export
 class AttrDict(MutableAttrMap, dict):
 
@@ -88,10 +92,46 @@ class AttrDict(MutableAttrMap, dict):
 		return self.__repr__()
 
 
+
+@export
+class MappingObject(Mapping):
+	"""Base class that allows an object to used as a mapping."""
+	__slots__ = ()
+	__mapping_attr__ = '__dict__'
+
+	def __len__(self):
+		return len(getattr(self, self.__mapping_attr__))
+
+	def __iter__(self):
+		return iter(getattr(self, self.__mapping_attr__))
+
+	def __contains__(self, key):
+		return hasattr(self, key)
+
+	def __getitem__(self, key):
+		try:
+			return getattr(self, key)
+		except AttributeError as e:
+			raise KeyError(key) from e
+
+
+@export
+class MutableMappingObject(MappingObject):
+	"""Base class that allows an object to used as a mutable mapping."""
+	__slots__ = ()
+
+	def __setitem__(self, key, value):
+		setattr(self, key, value)
+
+	def __delitem__(self, key):
+		delattr(self, key)
+
+
+
 @export
 class ChainMap(MutableMapping):
 
-	__slots__ = '__mappings_chain__',
+	__slots__ = ('__mappings_chain__',)
 
 	def __init__(self, *maps):
 		object.__setattr__(self, '__mappings_chain__', list(maps) or [{}])
@@ -101,7 +141,7 @@ class ChainMap(MutableMapping):
 		return self.__mappings_chain__
 
 	@property
-	def parents(self):
+	def parent(self):
 		return self.__class__(*self.maps[1:])
 
 	def push(self, *maps, i=None):
@@ -234,10 +274,19 @@ class AttrBag(object):
 	def get_keys(self):
 		return self.__bag__.keys()
 
+	def keys(self):
+		return self.__bag__.keys()
+
 	def get_values(self):
 		return self.__bag__.values()
 
+	def values(self):
+		return self.__bag__.values()
+
 	def get_items(self):
+		return self.__bag__.items()
+
+	def items(self):
 		return self.__bag__.items()
 
 	def copy(self):
@@ -263,16 +312,16 @@ class AttrBag(object):
 
 	def __getattr__(self, key):
 		try:
-			return self.__bag__[key]
+			return self[key]
 		except KeyError as e:
 			raise AttributeError(key) from e
 
 	def __setattr__(self, key, value):
-		self.__bag__[key] = value
+		self[key] = value
 
 	def __delattr__(self, key):
 		try:
-			del self.__bag__[key]
+			del self[key]
 		except KeyError as e:
 			raise AttributeError(key) from e
 
@@ -297,11 +346,13 @@ _sequence_index_re = re.compile(r'^\[([0-9]+)\]$')
 
 @export
 class BaseMutableNestedMapping(object):
+	__slots__ = ()
 
-	__slots__ = (
-		# '_pathsep', '_mapping_factory', '_sequence_factory',
-		# '_mapping_types', '_sequence_types'
-	)
+	# __slotted__ = (
+	# 	'_pathsep', '_mapping_factory', '_sequence_factory',
+	# 	'_mapping_types', '_sequence_types'
+	# )
+
 	__pathsep__ = '.'
 	__mapping_factory__ = lambda s, k, p: dict()
 	__sequence_factory__ = lambda s, k, p: list()

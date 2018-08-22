@@ -1,15 +1,17 @@
 from werkzeug.local import LocalProxy, Local
-from functools import update_wrapper
-from collections import defaultdict
+from .decorators import export
 
+__all__ = [
+	'Local',
+]
 
+@export
 class Proxy(LocalProxy):
-
 	__slots__ = ()
 
 
+@export
 class CallableProxy(Proxy):
-
 	__slots__ = ('__doc__',)
 
 	def __init__(self, func, name=None):
@@ -20,6 +22,8 @@ class CallableProxy(Proxy):
 		return self._get_current_object()
 
 
+
+@export
 def proxy(func=None, name=None, callable=False):
 	"""A decorator that converts a function into a `Proxy` or `CallableProxy`.
 	"""

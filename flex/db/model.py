@@ -18,7 +18,7 @@ from flex.conf import config
 from flex import carbon
 from flex.core.exc import ImproperlyConfigured
 from flex.utils.module_loading import import_string
-from flex.utils.decorators import locked_cached_property
+from flex.utils.decorators import locked_cached_property, class_property
 
 from .managers import Manager, ArchivesManager
 
@@ -319,8 +319,17 @@ class ModelMeta(BaseModelMeta):
 
 
 
+
+del ModelBase.__iter__
+
+
 class BaseModel(ModelBase):
 	metaclass = ModelMeta
+
+	@class_property
+	def __dict_args__(cls):
+		"""Per model configuration of :meth:`to_dict` serialization options."""
+		return {'adapters': {}}
 
 	@hybrid_property
 	def pk(self):

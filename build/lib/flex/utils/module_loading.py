@@ -2,13 +2,13 @@ import sys
 import os
 import warnings
 import importlib
-from collections import MutableMapping, Mapping
 from importlib.util import find_spec
 
 
 
 def import_module(name, package=None):
 	return importlib.import_module(name, package=package)
+
 
 def import_string(import_name, package=None, *, silent=False):
 	"""Imports an object or module based on a string.
@@ -29,7 +29,7 @@ def import_string(import_name, package=None, *, silent=False):
 		if not item:
 			return module
 	except ImportError as e:
-		if silent and e.name.endswith(path.lstrip('.')):
+		if silent and hasattr(e, 'name') and e.name and e.name.endswith(path.lstrip('.')):
 			return
 		raise e
 
@@ -41,6 +41,12 @@ def import_string(import_name, package=None, *, silent=False):
 				'Module %s has no attribute %s.' % (module.__name__, item)
 			 ) from e
 
+
+def import_if_string(value, package=None, *, silent=False):
+	if isinstance(value, str):
+		return import_string(value, package, silent=silent)
+	else:
+		return value
 
 
 def import_strings(value, package=None, *, silent=False):

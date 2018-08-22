@@ -31,13 +31,12 @@ def is_informational(code):
 def is_success(code):
 	return 200 <= code <= 299
 
+def is_redirect(code):
+	return 300 <= code <= 399
 
 def is_status_ok(code):
 	return is_success(code) or is_redirect(code)
 
-
-def is_redirect(code):
-	return 300 <= code <= 399
 
 
 def is_client_error(code):

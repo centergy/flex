@@ -38,6 +38,9 @@ class EnumMeta(BaseEnumMeta):
 			except KeyError:
 				raise e
 
+	def __repr__(self):
+		return '%s' % (self.__name__)
+
 
 @export
 class Enum(EnumMeta('Enum', (BaseEnum,), _EnumDict())):
@@ -46,13 +49,13 @@ class Enum(EnumMeta('Enum', (BaseEnum,), _EnumDict())):
 	def choices(cls):
 		return tuple((m.value, m.label) for m in cls)
 
-	def __str__(self):
-		return str(self.label)
+	# def __repr__(self):
+	# 	return '%s(%r)' % (self, self.value)
 
 
 @export
 class IntEnum(EnumMeta('IntEnum', (BaseIntEnum,), _EnumDict())):
-
-	def __str__(self):
-		return str(self.label)
+	__slots__ = ()
+	# def __repr__(self):
+	# 	return '%s(%r)' % (self, self.value)
 

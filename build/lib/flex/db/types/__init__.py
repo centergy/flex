@@ -60,7 +60,7 @@ from sqlalchemy.types import (
 
 
 from sqlalchemy_utils.types import (
-	ArrowType,
+	ArrowType as BaseArrowType,
 	ChoiceType,
 	ColorType,
 	CompositeArray,
@@ -95,7 +95,7 @@ from sqlalchemy_utils.types import (
 __all__ = []
 
 from sqlalchemy.dialects import postgresql as pg
-
+from sqlalchemy.util import generic_repr
 
 import six
 import arrow
@@ -107,48 +107,54 @@ from flex.conf import config
 from flex.locale import locale
 
 
-class Choice(ChoiceType):
+class _GenericReprMixin(object):
+
+	def __repr__(self):
+		return generic_repr(self)
+
+
+
+class Choice(_GenericReprMixin, ChoiceType):
+	pass
+
+class Color(_GenericReprMixin, ColorType):
 	pass
 
 
-class Color(ColorType):
+class Country(_GenericReprMixin, CountryType):
 	pass
 
 
-class Country(CountryType):
+class Currency(_GenericReprMixin, CurrencyType):
 	pass
 
 
-class Currency(CurrencyType):
+class Composite(_GenericReprMixin, CompositeType):
 	pass
 
 
-class Composite(CompositeType):
+class DateRange(_GenericReprMixin, DateRangeType):
 	pass
 
 
-class DateRange(DateRangeType):
+class DateTimeRange(_GenericReprMixin, DateTimeRangeType):
 	pass
 
 
-class DateTimeRange(DateTimeRangeType):
+class Encrypted(_GenericReprMixin, EncryptedType):
 	pass
 
 
-class Encrypted(EncryptedType):
+class Email(_GenericReprMixin, EmailType):
 	pass
 
 
-class Email(EmailType):
-	pass
-
-
-class URL(URLType):
+class URL(_GenericReprMixin, URLType):
 	pass
 
 
 
-class Carbon(types.ArrowType):
+class Carbon(_GenericReprMixin, BaseArrowType):
 
 	carbon_factory = carbon.carbon
 
@@ -165,6 +171,11 @@ class Carbon(types.ArrowType):
 			value = value.to('UTC')
 		return value.datetime if self.impl.timezone else value.naive
 
+	def process_result_value(self, value, dialect):
+		if value:
+			return self.carbon_factory.get(value)
+		return value
+
 	def _coerce(self, value):
 		if value is None or isinstance(value, self.carbon_factory.type):
 			return value
@@ -180,9 +191,39 @@ class Carbon(types.ArrowType):
 			value = self.carbon_factory.get(value)
 		return value
 
+ArrowType = Carbon
 
 
-class Password(BasePasswordType):
+# class Timespan(TypeDecorator):
+
+# 	impl = Unicode(40)
+# 	timespan_class = carbon.timespan
+# 	python_type = carbon.timespan
+
+# 	def process_bind_param(self, value, dialect):
+# 		return None if value is None else str(self._coerce(value))
+
+# 	def process_result_value(self, value, dialect):
+# 		return value and self.timespan_class.parse(value) or None
+
+# 	def process_literal_param(self, value, dialect):
+# 		return None if value is None else str(self._coerce(value))
+
+# 	def _coerce(self, value):
+# 		if value is None:
+# 			return None
+# 		elif isinstance(value, self.timespan_class):
+# 			return value
+# 		else:
+# 			return self.timespan_class.parse(value)
+
+# 	@property
+# 	def python_type(self):
+# 		return self.impl.type.python_type
+
+
+
+class Password(_GenericReprMixin, BasePasswordType):
 	"""docstring for PasswordType"""
 	def __init__(self, max_length=None, onload=None, **kwargs):
 		length = kwargs.pop('length', None)
@@ -199,7 +240,7 @@ PasswordMutable.associate_with(Password)
 
 
 
-class PhoneNumber(BasePhoneNumberType):
+class PhoneNumber(_GenericReprMixin, BasePhoneNumberType):
 	default_region = 'KE'
 
 	def __init__(self, region=None, max_length=20, *args, **kwargs):

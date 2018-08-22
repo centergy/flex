@@ -80,8 +80,9 @@ def pad(text, length, value = ' '):
 	if size < 1:
 		return text
 
-	mult = math.ceil(size/len(value))
-	pad = (value * mult)[:size] if mult > 0 else ''
+	pad = (value*size)[:size-1]
+	# mult = math.ceil(size/len(value))
+	# pad = (value * mult)[:size] if mult > 0 else ''
 	return text+pad if length > 0 else pad+text
 
 

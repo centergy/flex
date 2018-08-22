@@ -12,7 +12,7 @@ from ..http.status import is_http_status_code
 from ..helpers import uzi
 from .. import helpers
 
-from .options import BaseViewOptions, viewoption
+from .options import ViewOptions as BaseViewOptions, viewoption
 
 
 __all__ = [
@@ -80,8 +80,8 @@ class ViewType(type):
 		cls.decorators = decorators
 		cls.declared_methods = set(declared_http_methods(cls))
 
-		# cls._meta = cls._create_options()
-		# cls._meta._prepare()
+		cls._meta = cls._create_options()
+		cls._meta._prepare()
 
 		return cls
 
@@ -130,8 +130,6 @@ class ViewOptions(BaseViewOptions):
 			for d in c._meta.decorators:
 				if d not in value:
 					value.append(d)
-		print('decorators:', self.view.__name__, value)
-
 		return value
 
 

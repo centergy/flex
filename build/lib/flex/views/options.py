@@ -111,7 +111,7 @@ class viewoption(object):
 
 
 @export
-class BaseViewOptions(object):
+class ViewOptions(object):
 
 	def __init__(self, view, meta, base=None):
 		self.view = view

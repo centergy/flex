@@ -432,7 +432,6 @@ class RedisSessionInterface(SessionInterface, BaseCookieInterface):
 		if not self.redis:
 			warn("RedisSessionInterface requires a redix client instance.")
 			return None
-
 		sid = self.load_session_id(app, request)
 		if sid:
 			val = self.redis.get(self.get_prefix(app) + sid)
@@ -454,8 +453,7 @@ class RedisSessionInterface(SessionInterface, BaseCookieInterface):
 			return
 
 		domain = self.get_cookie_domain(app)
-		path = self.get_cookie_path(app)
-
+		path = self.get_cookie_path(app) or '/'
 		if not session:
 			if hasattr(session, 'id'):
 

@@ -10,8 +10,18 @@ from .client import Client
 from . import types, utils
 import uuid
 
+
 def uuid_pk_column(as_uuid=True, default=uuid.uuid4, **kw):
 	return Column(types.pg.UUID(as_uuid=as_uuid), primary_key=True, default=default, **kw)
+
+
+def int_pk_column(**kw):
+	return Column(types.Integer, primary_key=True, **kw)
+
+
+def big_int_pk_column(**kw):
+	return Column(types.BigInteger, primary_key=True, **kw)
+
 
 db = Client()
 

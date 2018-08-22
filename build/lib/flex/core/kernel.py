@@ -7,15 +7,18 @@ from flask.helpers import find_package
 from flask.app import setupmethod
 from functools import update_wrapper
 
+from flex.utils import json
+from flex.http import Request, Response
+from flex.datastructures import AttrDict
+from flex.conf import Config, config as global_config
+from flex.utils.decorators import locked_cached_property
+from flex.utils.module_loading import import_string, import_strings
+
 from . import signals
-from ..http import Request, Response
-from ..conf import Config, config as global_config
-from .cli import Manager, Shell, Server
-from ..utils.module_loading import import_string, import_strings
+from .cli import Manager, Shell, Server, install_command
 from .sessions import SecureCookieSessionInterface
-from ..utils.decorators import locked_cached_property
 from .exc import ImproperlyConfigured
-from ..utils import json
+
 
 
 def postboot_method(f):
@@ -82,14 +85,16 @@ class Kernel(Flask):
 		)
 
 		super(Kernel, self).__init__(import_name, **kwargs)
+		self.extensions = AttrDict()
 		self._has_booted = False
 
 	@locked_cached_property
 	def console(self):
 		if self.is_cli:
 			rv = Manager(self, with_default_commands=False)
-			rv.add_command("start", Server())
+			rv.add_command("start", Server(host=self.config.HOST, port=self.config.PORT))
 			rv.add_command("shell", Shell())
+			rv.command(install_command, name="install")
 			return rv
 
 	@locked_cached_property
@@ -125,6 +130,7 @@ class Kernel(Flask):
 		root_path = self.instance_path if instance_relative else self.root_path
 		rv = self.config_class(root_path, {}, global_config)
 		rv.setdefaults(self.default_config)
+		# rv.bootstrap()
 		return rv
 
 	def auto_find_instance_path(self):
@@ -151,32 +157,38 @@ class Kernel(Flask):
 	def init_default_addons(self):
 		"""Initialize addons configured under the ADDONS config key.
 		"""
-		for addon in import_strings(self.config.get('DEFAULT_ADDONS', ())):
+		# for addon in import_strings(self.config.get('DEFAULT_ADDONS', ())):
+		# 	self.init_addon(addon)
+		for addon in self._iter_default_addons():
 			self.init_addon(addon)
 
 	@preboot_method
 	def init_configured_addons(self):
 		"""Initialize addons configured under the ADDONS config key.
 		"""
-		try:
-			addons = import_strings(self.config.get('ADDONS', ()))
-		except ImportError as e:
-			raise ImproperlyConfigured(
-					'ADDONS configuration for kernel: %r.' % self.name
-				) from e
-		else:
-			for addon in addons:
-				self.init_addon(addon)
+		# try:
+		# 	addons = import_strings(self.config.get('ADDONS', ()))
+		# except ImportError as e:
+		# 	raise ImproperlyConfigured(
+		# 			'ADDONS configuration for kernel: %r.' % self.name
+		# 		) from e
+		# else:
+		# 	for addon in addons:
+		# 		self.init_addon(addon)
+		for addon in self._iter_configured_addons():
+			self.init_addon(addon)
 
 	@setupmethod
 	def init_addon(self, addon):
-		if isinstance(addon, str):
-			try:
-				addon = import_string(addon)
-			except Exception as e:
-				raise ImproperlyConfigured(
-						'Addon %r for kernel %r.' % (addon, self.name)
-					) from e
+		# if isinstance(addon, str):
+		# 	try:
+		# 		addon = import_string(addon)
+		# 	except Exception as e:
+		# 		raise ImproperlyConfigured(
+		# 				'Addon %r for kernel %r.' % (addon, self.name)
+		# 			) from e
+
+		addon = self._load_addon(addon)
 
 		if inspect.isfunction(addon):
 			addon(self)
@@ -187,6 +199,22 @@ class Kernel(Flask):
 				)
 			addon.init_app(self)
 		return addon
+
+	def _iter_default_addons(self):
+		for addon in self.config.get('DEFAULT_ADDONS', ()):
+			yield self._load_addon(addon)
+
+	def _iter_configured_addons(self):
+		for addon in self.config.get('ADDONS', ()):
+			yield self._load_addon(addon)
+
+	def _load_addon(self, addon):
+		try:
+			return import_string(addon) if isinstance(addon, str) else addon
+		except ImportError as e:
+			raise ImproperlyConfigured(
+					'Addon %r for kernel %r.' % (addon, self.name)
+				) from e
 
 	def route(self, rule, view_func=None, endpoint=None, **options):
 		"""Registers a view function for a given URL rule. If a function is not

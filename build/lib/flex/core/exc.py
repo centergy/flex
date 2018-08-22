@@ -1,4 +1,4 @@
-from flex.http import exc as http
+# from flex.http import exc as http
 from marshmallow import ValidationError as BaseValidationError
 __all__ = [
 	'ImproperlyConfigured', 'UnSafeUrlError', 'ValidationError'

@@ -4,7 +4,7 @@ import socket
 
 from flex.conf import config
 from flex.utils.module_loading import import_string
-from flex.core.cache.backends.base import BaseCache, DEFAULT_TIMEOUT
+from .base import BaseCache, DEFAULT_TIMEOUT
 from flex.utils.decorators import locked_cached_property
 
 from redis.exceptions import ConnectionError, ResponseError, TimeoutError
@@ -45,9 +45,10 @@ def omit_exception(method=None, return_value=None):
 
 class RedisCache(BaseCache):
 	def __init__(self, url, options):
-
-		params = config.app.namespace('REDIS_').new()
-		params.setdefaults(options)
+		params = dict(config.top.get_namespace('REDIS_'))
+		params.update(options)
+		# params = config.top.namespace('REDIS_').new(options)
+		# params.setdefaults(options)
 
 		super(RedisCache, self).__init__(params)
 		self._url = url or params.get('url')
@@ -111,8 +112,13 @@ class RedisCache(BaseCache):
 		return self.client.delete(*(self.make_key(k, version) for k in keys))
 
 	@omit_exception
-	def incr(self, key, delta=1, version=None):
-		return self.client.incr(self.make_key(key, version), delta)
+	def incr(self, key, delta=1, default=None, timeout=DEFAULT_TIMEOUT, version=None):
+		ck = self.make_key(key, version)
+		if ck not in self.client and default is not None:
+			self.client.set(ck, default, self.get_timeout(timeout), nx=True)
+			return default
+
+		return self.client.incr(ck, delta)
 
 	@omit_exception
 	def decr(self, key, delta=1, version=None):
@@ -143,9 +149,9 @@ class RedisCache(BaseCache):
 		return self.client.expire(self.make_key(key, version), timeout)
 
 	@omit_exception
-	def lock(self, key, version=None, timeout=None, sleep=0.1, blocking_timeout=None):
+	def lock(self, key, version=None, timeout=None, blocking_timeout=None):
 		return self.client.lock(self.make_key(key, version),
-					timeout=timeout, sleep=sleep,
+					timeout=timeout,
 					blocking_timeout=blocking_timeout
 				)
 

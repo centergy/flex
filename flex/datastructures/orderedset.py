@@ -1,8 +1,12 @@
-import ordered_set
+try:
+	import ordered_set
 
-__all__ = ['OrderedSet']
+	__all__ = ['OrderedSet']
 
 
-class OrderedSet(ordered_set.OrderedSet):
+	class OrderedSet(ordered_set.OrderedSet):
+		pass
+
+except Exception:
 	pass
 

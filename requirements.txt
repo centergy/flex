@@ -29,5 +29,5 @@ SQLAlchemy==1.1.15
 sqlalchemy-mptt==0.2.2
 SQLAlchemy-Utils==0.32.18
 sqlservice==0.14.1
-urllib3==1.22
+urllib3==1.26.5
 Werkzeug==0.12.2
